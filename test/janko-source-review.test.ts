@@ -8,7 +8,7 @@ import type { IncomingMessage, ServerResponse } from 'node:http';
 import type { ViteDevServer } from 'vite';
 import { CANDIDATE_IDS, REFERENCE_IDS, SOURCE_DOCUMENTS, SOURCE_IMAGES, WORKS, SCHUMANN_NO13_ENDING_CITATION } from '../src/source-review/documents';
 import { schumannNo13WrittenFacts, buildSchumannNo13Draft } from '../src/scores/schumann-no13-draft';
-import { CURRENT_CANDIDATES, CURRENT_ROUND_METADATA, ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
+import { ROUND_60_CANDIDATES as CURRENT_CANDIDATES, ROUND_60_METADATA as CURRENT_ROUND_METADATA, ROUND_55_CANDIDATES } from '../src/render/janko/candidates';
 import { currentChoice, initialChoices, restoreChoices, selectDocument, selectWork, setPage, setZoom, STORAGE_KEY } from '../src/source-review/session';
 import { PDFJS_DECODER_PREFIX, SOURCE_PDF_PREFIX, sourcePdfPlugin, validatePdfBytes } from '../src/source-review/vite-plugin';
 

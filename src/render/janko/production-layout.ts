@@ -1,5 +1,6 @@
 import type { QuantizedGridScore } from '../../model/types';
 import type { ResolvedJankoLayoutOptions, ResolvedJankoTokens } from './types';
+import {getScaledKnockoutMetrics,JANKO_HALO_STROKE_WIDTH} from './elements/notehead';
 
 /** One admission decision. Bar numbers are indices into the literal unfolded boundary list. */
 export interface ProductionSystem {
@@ -22,7 +23,10 @@ export function planProductionLayout(score: QuantizedGridScore, o: ResolvedJanko
   const leftInsets: number[] = [];
   for (let b = 0; b < bars.length - 1; b++) {
     const inBar = score.notes.filter(n => n.startTick >= bars[b] && n.startTick < bars[b + 1]);
-    const onsets = [...new Set(inBar.map(n => n.startTick))];
+    const authored=o.authoredRestMode==='source'?(score.sourceSilences??[]).filter(q=>q.kind==='rest'&&q.startTick>=bars[b]&&q.startTick<bars[b+1]):[];
+    // Literal rest statements need their own rhythmic columns too. The
+    // protected head budget is conservative for the current rest glyphs.
+    const onsets = [...new Set([...inBar.map(n => n.startTick),...authored.map(q=>q.startTick)])];
     const densest = Math.max(1, ...onsets.map(tick => inBar.filter(n => n.startTick === tick).length));
     const graces = score.graceGroups?.flatMap(g => g.occurrences.filter(occ => occ.tick >= bars[b] && occ.tick < bars[b+1] && g.members.some(m => m.pitch))
       .map(occ => ({ tick: occ.tick, count: g.members.length }))) ?? [];
@@ -33,8 +37,22 @@ export function planProductionLayout(score: QuantizedGridScore, o: ResolvedJanko
     leftInsets.push(Math.max(6, o.comparisonInset??0, ...openingGrace.map(g => 15 + (g.count - 1) * 12.5 + 4.5)));
     // Protected barline insets; rhythmic columns, chord masks and pre-host
     // grace ink cannot borrow another measure's allocation.
-    const rhythmic = Math.max(1, onsets.length) * (2 * t.noteheadRadius + 4.2);
-    const chords = (densest - 1) * (2 * t.noteheadRadius + 2);
+    let headWidth=2*t.noteheadRadius;
+    if(o.productionWidthPolicy==='protected-heads'){
+      // The painter and collision fitter resolve this same protection, not
+      // the obsolete circular head placeholder. Keep simultaneous demands
+      // conservative: each possible chord member still reserves one width.
+      const ordinary=getScaledKnockoutMetrics(o,t);
+      const chord=getScaledKnockoutMetrics(o,t,o.chordSymbolScale,true);
+      headWidth=2*Math.max(ordinary.wx,densest>1&&o.chordSymbolScale!==1?chord.wx:0);
+      // Underlines grow protection vertically only. Expanded anchor dialects
+      // and nonliteral clusters do not claim the narrower admission contract.
+      const expanded=inBar.some(n=>n.readingDisplay?.isAnchor)&&o.readingAnchorMark!=='underline';
+      if(expanded||o.clusterPresentation!=='literal')headWidth=Math.max(headWidth,2*t.noteheadRadius);
+      if(o.showHonorHalo&&inBar.some(n=>n.startTick===0))headWidth=Math.max(headWidth,2*t.haloRadius+JANKO_HALO_STROKE_WIDTH);
+    }
+    const rhythmic = Math.max(1, onsets.length) * (headWidth + 4.2);
+    const chords = (densest - 1) * (headWidth + 2);
     const tied = score.tieChains?.some(chain => chain.components.some(c =>
       c.startTick >= bars[b] && c.startTick < bars[b + 1] && c.startTick !== chain.components[0].startTick));
     const folded = inBar.some(n => { const lin = n.pitch.octave * 12 + n.pitch.pitchClass;

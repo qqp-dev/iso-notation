@@ -7,7 +7,7 @@ import type { QuantizedGridScore } from '../../model/types';
 import { getDuodecimalDigit } from '../types';
 import type { JankoSystemLayout } from './engine';
 import { DEFAULT_JANKO_TOKENS } from './types';
-import type { ResolvedJankoLayoutOptions, ResolvedJankoTokens } from './types';
+import type { JankoLayoutOptions, ResolvedJankoLayoutOptions, ResolvedJankoTokens } from './types';
 import { placedLedgerRules, pitchGridRules } from './elements/staff';
 import { barlineStrokes, beatGridStrokes } from './elements/barlines';
 import { f } from './elements/style';
@@ -28,6 +28,11 @@ import type { PlacedChordBridge, PlacedClaspShell } from './connective-scene';
 
 import type { DepthRoute } from './depth-profile';
 
+export const READING_ANCHOR_FRAME_AIR=.3;
+export const READING_ANCHOR_FRAME_WIDTH=.3;
+export const READING_ANCHOR_PROTECTION_AIR=.2;
+export const READING_ANCHOR_BRACKET_COLOR='#4B5563';
+
 export const SCENE_VERSION = 6;
 export const SCENE_FONT = 'public/fonts/URWGothic-Demi.otf:sha256:5b009410cf5231dcb1e45b155c1afedcfc63d82042fd8c414d0dd7705c9fbbae:1000upm';
 export const SCENE_COVERAGE = {
@@ -37,6 +42,32 @@ export const SCENE_COVERAGE = {
 /** Stored emission authority is distinct from certified physical coverage. */
 export const SCENE_PAINT_COVERAGE = { stored: ['rests', 'beamed-solo'] as const, physical: 'partial stem/dot/ring exact; flag clearance-only/unknown near' as const } as const;
 export type InkBox = { x0: number; y0: number; x1: number; y1: number };
+/** Symmetric protection keeps the original played-head centre unchanged. */
+export function readingAnchorMaskBounds(glyph:InkBox,ordinary:InkBox):InkBox {
+  const cx=(ordinary.x0+ordinary.x1)/2,cy=(ordinary.y0+ordinary.y1)/2;
+  const air=READING_ANCHOR_FRAME_AIR+READING_ANCHOR_FRAME_WIDTH/2+READING_ANCHOR_PROTECTION_AIR;
+  const wx=Math.max(cx-ordinary.x0,cx-glyph.x0+air,glyph.x1-cx+air);
+  const hy=Math.max(cy-ordinary.y0,cy-glyph.y0+air,glyph.y1-cy+air);
+  return {x0:cx-wx,y0:cy-hy,x1:cx+wx,y1:cy+hy};
+}
+export function readingBracketMaskBounds(ink:readonly InkBox[],ordinary:InkBox):InkBox {
+  const cx=(ordinary.x0+ordinary.x1)/2,cy=(ordinary.y0+ordinary.y1)/2,air=READING_ANCHOR_PROTECTION_AIR;
+  const wx=Math.max(cx-ordinary.x0,...ink.flatMap(b=>[cx-b.x0+air,b.x1-cx+air]));
+  const hy=Math.max(cy-ordinary.y0,...ink.flatMap(b=>[cy-b.y0+air,b.y1-cy+air]));
+  return {x0:cx-wx,y0:cy-hy,x1:cx+wx,y1:cy+hy};
+}
+export function readingUnderlinePrimitive(glyph:Extract<InkPrimitive,{kind:'glyph'}>,ordinary:InkBox,width=.45,span?:number):Extract<InkPrimitive,{kind:'stroke'}> {
+  const b=glyphBox(glyph),y=b.y1+.55+width/2;
+  if(span!==undefined){const cx=(ordinary.x0+ordinary.x1)/2;return {kind:'stroke',x1:cx-span/2,y1:y,x2:cx+span/2,y2:y,width,cap:'butt'};}
+  // Wide shipped letters can overhang the ordinary head mask. The mark stays
+  // inside that existing footprint, with the same minimum protection air.
+  return {kind:'stroke',x1:Math.max(b.x0,ordinary.x0+READING_ANCHOR_PROTECTION_AIR),y1:y,x2:Math.min(b.x1,ordinary.x1-READING_ANCHOR_PROTECTION_AIR),y2:y,width,cap:'butt'};
+}
+/** Underlining consumes vertical room only; it does not widen the head footprint. */
+export function readingUnderlineMaskBounds(underline:InkBox,ordinary:InkBox):InkBox {
+  const cy=(ordinary.y0+ordinary.y1)/2,hy=Math.max(cy-ordinary.y0,underline.y1+READING_ANCHOR_PROTECTION_AIR-cy);
+  return {...ordinary,y0:cy-hy,y1:cy+hy};
+}
 export type InkPrimitive =
   | { kind: 'stroke'; x1: number; y1: number; x2: number; y2: number; width: number; cap: 'butt'; dash?: string }
   | { kind: 'beam'; beam: BeamPiece }
@@ -44,6 +75,7 @@ export type InkPrimitive =
   | { kind: 'glyph'; digit: string; x: number; baseline: number; em: number; face: typeof SCENE_FONT }
   | { kind: 'erase'; box: InkBox; protects: 'own-digit' | 'strict-grid-air'; stroke?: Extract<InkPrimitive,{kind:'stroke'}> };
 export interface InkPiece {
+  reading?:{pitchClass:number;relativeClass:number;relativeOctave:number;referencePitch:number;isAnchor:boolean;anchorMark?:'brackets'|'underline';mode?:'relative'|'absolute';groupId?:string;groupHasBothParities?:boolean;noteX?:number};
   id: string;
   family: typeof SCENE_COVERAGE.migrated[number];
   ownerIds: readonly string[];
@@ -69,7 +101,8 @@ export function serializeInkPiece(piece: InkPiece): string {
     requirePinnedFace(p);
     const size=p.em/JANKO_USER_UNITS_PER_PT;
     const sizeStr=size%1===0?size.toFixed(1):Number(size.toFixed(3));
-    return `    <text class="${cls}" x="${f(p.x)}" y="${f(p.baseline)}" font-weight="700" font-size="${sizeStr}pt" fill="${color}">${p.digit}</text>`;
+    const bracket=cls==='janko-reading-anchor-bracket'?' font-family="URW Gothic" text-anchor="middle"':'';
+    return `    <text class="${cls}" x="${f(p.x)}" y="${f(p.baseline)}" font-weight="700" font-size="${sizeStr}pt" fill="${color}"${bracket}>${p.digit}</text>`;
   }
   if(p.kind==='erase'&&!p.stroke){
     const b=p.box;
@@ -82,7 +115,7 @@ export function serializeInkPiece(piece: InkPiece): string {
 function inkPiece(data:Omit<InkPiece,'svg'>):InkPiece {
   return Object.defineProperty(data,'svg',{get(this:InkPiece){return serializeInkPiece(this);},enumerable:true}) as InkPiece;
 }
-function primitiveBox(p:InkPrimitive):InkBox {
+export function primitiveBox(p:InkPrimitive):InkBox {
   if(p.kind==='erase')return p.stroke?strokeBox(p.stroke):p.box;
   if(p.kind==='stroke')return strokeBox(p);
   if(p.kind==='glyph')return glyphBox(p);
@@ -139,10 +172,21 @@ function glyphBox(p: Extract<InkPrimitive,{kind:'glyph'}>): InkBox {
   const g = GOTHIC_DEMI_GLYPHS[p.digit];
   if (!g) throw new Error(`Unsupported painted-ink glyph ${p.digit}`);
   const points = g.contours.flat();
-  return box(p.x+(Math.min(...points.map(pt=>pt[0]))-g.advance/2)*p.em/1000,
-    p.baseline-Math.max(...points.map(pt=>pt[1]))*p.em/1000,
-    p.x+(Math.max(...points.map(pt=>pt[0]))-g.advance/2)*p.em/1000,
-    p.baseline-Math.min(...points.map(pt=>pt[1]))*p.em/1000);
+  const bounds=g.bounds??[Math.min(...points.map(pt=>pt[0])),Math.min(...points.map(pt=>pt[1])),Math.max(...points.map(pt=>pt[0])),Math.max(...points.map(pt=>pt[1]))];
+  return box(p.x+(bounds[0]-g.advance/2)*p.em/1000,p.baseline-bounds[3]*p.em/1000,
+    p.x+(bounds[2]-g.advance/2)*p.em/1000,p.baseline-bounds[1]*p.em/1000);
+}
+export const glyphInkBox=glyphBox;
+/** Native font glyphs, seated from actual digit/bracket ink rather than advance. */
+export function readingBracketGlyphs(glyph:Extract<InkPrimitive,{kind:'glyph'}>):Extract<InkPrimitive,{kind:'glyph'}>[] {
+  const b=glyphBox(glyph),center=(b.y0+b.y1)/2;
+  return ['[',']'].map((digit,i)=>{
+    const g=GOTHIC_DEMI_GLYPHS[digit],bounds=g.bounds!;
+    const target=i?b.x1+READING_ANCHOR_FRAME_AIR:b.x0-READING_ANCHOR_FRAME_AIR;
+    const x=target-(bounds[i?0:2]-g.advance/2)*glyph.em/1000;
+    const baseline=center+(bounds[1]+bounds[3])/2*glyph.em/1000;
+    return {...glyph,digit,x,baseline};
+  });
 }
 function ledgerPieces(layout:JankoSystemLayout,o:ResolvedJankoLayoutOptions,t:ResolvedJankoTokens,pagePiece:number):InkPiece[] {
   const system=layout.index, g=layout.geometry, out:InkPiece[]=[];
@@ -182,21 +226,42 @@ function orderedPieces(scene:InkScene):InkPiece[] {
     ...scene.beams.flat().map(beamAsInkPiece),
     ...(strict?[...scene.beat,...scene.barlines]:[]),...[...scene.heads.values()].flat()];
 }
+export function readingBracketPrimitives(glyph:Extract<InkPrimitive,{kind:'glyph'}>,square?:JankoLayoutOptions['readingAnchorSquare']):InkPrimitive[] {
+  if(!square)return readingBracketGlyphs(glyph);
+  const b=glyphBox(glyph),{stroke:width,sideAir,verticalAir,arm}=square;
+  const top=b.y0-verticalAir-width/2,bottom=b.y1+verticalAir+width/2;
+  const left=b.x0-sideAir-arm-width/2,right=b.x1+sideAir+arm+width/2;
+  const edges=[[left,top-width/2,left,bottom+width/2],[left-width/2,top,left+arm,top],[left-width/2,bottom,left+arm,bottom],
+    [right,top-width/2,right,bottom+width/2],[right-arm,top,right+width/2,top],[right-arm,bottom,right+width/2,bottom]];
+  return edges.map(([x1,y1,x2,y2])=>({kind:'stroke',x1,y1,x2,y2,width,cap:'butt'}));
+}
 function headPieces(spec: JankoNoteheadSpec, id: string, tick: number, system: number, pagePiece: number, o: ResolvedJankoLayoutOptions, t: ResolvedJankoTokens, owners: readonly string[]): InkPiece[] {
   const scale=spec.symbolScale??1;
   const metrics=getScaledKnockoutMetrics(o,t,scale,spec.chordMember===true);
   const hy=metrics.hy+(spec.tallKnockout?t.stemAttachmentAir:0);
   const digit=spec.digit??getDuodecimalDigit(spec.pitchClass);
-  const glyph: InkPrimitive={kind:'glyph',digit,x:spec.x,baseline:spec.y+digitBaselineOffset(t.digitFontSize*scale),em:t.digitFontSize*scale*JANKO_USER_UNITS_PER_PT,face:SCENE_FONT};
+  const em=t.digitFontSize*scale*JANKO_USER_UNITS_PER_PT;
+  const glyph: InkPrimitive={kind:'glyph',digit,x:spec.x+(spec.readingGlyphSeat??0)*em,baseline:spec.y+digitBaselineOffset(t.digitFontSize*scale),em,face:SCENE_FONT};
   const make=(suffix:string,primitive:InkPrimitive,cls:string,color:string): InkPiece => inkPiece({id:`s${system}:head:${id}:${suffix}`,family:'ordinary-noteheads',ownerIds:owners,tick,system,pagePiece,layer:'head',primitive,box:primitiveBox(primitive),paint:{cls,color}});
   const out:InkPiece[]=[];
   if(spec.isPositionOfHonor){
     const r=t.haloRadius,w=JANKO_HALO_STROKE_WIDTH;
     out.push(make('halo',{kind:'ring',cx:spec.x,cy:spec.y,radius:r,width:w},'janko-halo','#111111'));
   }
-  const mask=box(spec.x-metrics.wx,spec.y-hy,spec.x+metrics.wx,spec.y+hy);
+  const ordinary=box(spec.x-metrics.wx,spec.y-hy,spec.x+metrics.wx,spec.y+hy);
+  const brackets=spec.readingAnchor&&o.readingAnchorMark==='brackets'?readingBracketPrimitives(glyph,o.readingAnchorSquare):[];
+  const underline=spec.readingAnchor&&o.readingAnchorMark==='underline'?readingUnderlinePrimitive(glyph,ordinary,o.readingUnderlineStroke,o.readingUnderlineWidth):undefined;
+  const mask=underline?readingUnderlineMaskBounds(primitiveBox(underline),ordinary):brackets.length?readingBracketMaskBounds([glyphBox(glyph),...brackets.map(primitiveBox)],ordinary):spec.readingAnchor?readingAnchorMaskBounds(glyphBox(glyph),ordinary):ordinary;
   out.push(make('mask',{kind:'erase',box:mask,protects:'own-digit'},'janko-knockout','#FFFFFF'));
   out.push(make('digit',glyph,'janko-digit','#111111'));
+  if(underline){out.push(make('reading-underline',underline,'janko-reading-anchor-underline','#000000'));}
+  else if(brackets.length){
+    brackets.forEach((bracket,i)=>out.push(make(`reading-bracket${i}`,bracket,'janko-reading-anchor-bracket',o.readingAnchorSquare?'#000000':READING_ANCHOR_BRACKET_COLOR)));
+  }else if(spec.readingAnchor){
+    const b=glyphBox(glyph),pad=READING_ANCHOR_FRAME_AIR,width=READING_ANCHOR_FRAME_WIDTH;
+    const edges=[[b.x0-pad,b.y0-pad,b.x1+pad,b.y0-pad],[b.x1+pad,b.y0-pad,b.x1+pad,b.y1+pad],[b.x1+pad,b.y1+pad,b.x0-pad,b.y1+pad],[b.x0-pad,b.y1+pad,b.x0-pad,b.y0-pad]];
+    edges.forEach(([x1,y1,x2,y2],i)=>out.push(make(`reading-frame${i}`,{kind:'stroke',x1,y1,x2,y2,width,cap:'butt'},'janko-reading-anchor-frame','#6B7280')));
+  }
   return out;
 }
 /** This constructor runs AFTER final page shifts/re-layout. Preliminary seat queries
@@ -230,7 +295,11 @@ export function buildInkScene(layout:JankoSystemLayout,o:ResolvedJankoLayoutOpti
     // Merged contributors disappear from layout.notes, including exact voices
     // which also disappear from unisonVoices. The merge ledger owns them all.
     const contributors=[p.note.id,...layout.unisonMerges.filter(m=>m.survivorId===p.note.id).flatMap(m=>m.mergedIds)];
-    heads.set(p.note.id,headPieces({x:p.x,y:p.y,pitchClass:p.coord.pitchClass,hand:p.coord.hand,isPositionOfHonor:p.note.startTick===0&&o.showHonorHalo,tallKnockout:p.tallKnockout===true,symbolScale:p.symbolScale,chordMember:p.symbolChord},p.note.id,p.note.startTick,system,pagePiece,o,t,contributors));
+    const reading=p.note.readingDisplay;
+    const displayedDigit=reading?getDuodecimalDigit(reading.isAnchor||reading.mode==='absolute'?p.coord.pitchClass:reading.pitchClass):undefined;
+    const pieces=headPieces({x:p.x,y:p.y,pitchClass:p.coord.pitchClass,...(reading?{digit:displayedDigit,readingAnchor:reading.isAnchor,readingGlyphSeat:o.readingGlyphSeats?.[displayedDigit as '1'|'B']}:{}),hand:p.coord.hand,isPositionOfHonor:p.note.startTick===0&&o.showHonorHalo,tallKnockout:p.tallKnockout===true,symbolScale:p.symbolScale,chordMember:p.symbolChord},p.note.id,p.note.startTick,system,pagePiece,o,t,contributors);
+    if(reading)for(const piece of pieces)piece.reading={pitchClass:reading.isAnchor||reading.mode==='absolute'?p.coord.pitchClass:reading.pitchClass,relativeClass:reading.pitchClass,relativeOctave:reading.relativeOctave,referencePitch:reading.referencePitch,isAnchor:reading.isAnchor,...(reading.mode?{mode:reading.mode,groupId:reading.groupId,groupHasBothParities:reading.groupHasBothParities}:{}),...(o.readingAnchorMark==='brackets'||o.readingAnchorMark==='underline'?{anchorMark:o.readingAnchorMark}:{}),...(o.readingGlyphSeats?{noteX:p.x}:{})};
+    heads.set(p.note.id,pieces);
   }
   const restPaint=layout.rests.map((rest,i)=>placedRestPaint(rest,system,pagePiece,i,t));
   const sourceNotes=new Map([...source.notes,...layout.notes.map(p=>p.note),...layout.unisonVoices.map(p=>p.note)].map(note=>[note.id,note] as const));
@@ -491,7 +560,13 @@ export function sceneRestSvg(scene:InkScene,order:number):string {
 export function sceneHeadSvg(scene:InkScene,id:string):string {
   const pieces=scene.heads.get(id);
   if(!pieces)throw new Error(`Missing scene notehead ${id}`);
-  return pieces.map(p=>p.svg).join('\n');
+  const body=pieces.map(p=>p.svg).join('\n'),reading=pieces[0]?.reading;
+  if(!reading)return body;
+  const xml=(s:string)=>s.replaceAll('&','&amp;').replaceAll('"','&quot;').replaceAll('<','&lt;').replaceAll('>','&gt;');
+  const scope=reading.mode?` data-reading-mode="${reading.mode}" data-reading-group="${xml(reading.groupId??'')}" data-group-both-parities="${reading.groupHasBothParities??false}"`:"";
+  const marker=reading.anchorMark?` data-anchor-mark="${reading.anchorMark}"`:'';
+  const axis=reading.noteX!==undefined?` data-note-x="${reading.noteX}"`:'';
+  return `<g class="janko-reading-head" data-note-id="${xml(id)}" data-owner-ids="${xml(pieces[0].ownerIds.join('|'))}" data-displayed-class="${reading.pitchClass}" data-displayed-digit="${getDuodecimalDigit(reading.pitchClass)}" data-relative-class="${reading.relativeClass}" data-relative-octave="${reading.relativeOctave}" data-active-reference="${reading.referencePitch}" data-is-anchor="${reading.isAnchor}"${marker}${axis}${scope}>${body}</g>`;
 }
 /** Explicit partial-coverage guard for callers needing other families. */
 export function requireSceneCoverage(scene:InkScene,family:string):void {

@@ -357,7 +357,9 @@ export function resolveBeatPulses(
   columns?: ReadonlyMap<number, number> | null
 ): Array<{ tick: number; x: number }> {
   if (!o.showBeatGrid) return [];
-  const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / t.ticksPerBeat));
+  const pulseTicks = o.beatPulseTicks ?? t.ticksPerBeat;
+  if (!Number.isInteger(pulseTicks) || pulseTicks <= 0) throw Error('Invalid visual pulse spacing');
+  const beatsPerMeasure = Math.max(1, Math.round(t.ticksPerMeasure / pulseTicks));
   if (beatsPerMeasure <= 1) return [];
 
   const baseInset = getGridNoteInset(o, t);
@@ -387,7 +389,7 @@ export function resolveBeatPulses(
       ? anacrusis + m * t.ticksPerMeasure
       : anacrusis + sourceBar * t.ticksPerMeasure);
     const beatCount = geo.sourceBarTicks
-      ? Math.ceil((geo.sourceBarTicks[sourceBar + 1] - measureStartTick) / t.ticksPerBeat)
+      ? Math.ceil((geo.sourceBarTicks[sourceBar + 1] - measureStartTick) / pulseTicks)
       : beatsPerMeasure;
     // Round 33 `none`: no interior pulse paints at all (barlines always do).
     if (o.gridPulseFilter === 'none') continue;
@@ -397,12 +399,12 @@ export function resolveBeatPulses(
       // Odd subdivisions with no existing midpoint retain nothing here.
       if (
         o.gridPulseFilter === 'midpoint-only' &&
-        b * t.ticksPerBeat * 2 !== t.ticksPerMeasure
+        b * pulseTicks * 2 !== t.ticksPerMeasure
       ) {
         continue;
       }
-      const tick = measureStartTick + b * t.ticksPerBeat;
-      out.push({ tick, x: columns?.get(tick) ?? measureLeft + left + (b * t.ticksPerBeat / (geo.sourceBarTicks ? geo.sourceBarTicks[sourceBar + 1] - measureStartTick : t.ticksPerMeasure)) * available });
+      const tick = measureStartTick + b * pulseTicks;
+      out.push({ tick, x: columns?.get(tick) ?? measureLeft + left + (b * pulseTicks / (geo.sourceBarTicks ? geo.sourceBarTicks[sourceBar + 1] - measureStartTick : t.ticksPerMeasure)) * available });
     }
   }
   return out;

@@ -6,6 +6,8 @@ import {readFileSync,mkdtempSync,rmSync} from 'node:fs';
 import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {no14GoldProfile,no14GoldOriginProfile,no14GoldPrePrintProfile,no14GoldPrePrintSvgAsAccepted,no14GoldStudioSvg,NO14_GOLD_ACCEPTANCE,NO14_GOLD_IDENTITY,NO14_GOLD_REFERENCE_ID,NO14_GOLD_NOTICE} from '../src/render/janko/no14-gold';
+import {no14PublishedProfile,NO14_PUBLISHED_IDENTITY} from '../src/render/janko/no14-published';
+import {no14GestureOpenProfile} from '../src/render/janko/no14-gesture-relative';
 import {assertSystemSvgTranslation,systemSvgFragments} from './support/system-svg-translation';
 import {pageBodyBounds,runningHeaderBand,RUNNING_HEAD_AIR} from '../src/render/janko/page-booking';
 import {lintJankoScore} from '../src/render/janko/linter';
@@ -33,7 +35,7 @@ test('GOLD preserves selected A music while declaring the operator-requested pri
  assert.throws(()=>no14GoldPrePrintSvgAsAccepted(`<svg>${NO14_GOLD_NOTICE.replaceAll('&','&amp;')}</svg>`,1));
 });
 
-test('Reference settles GOLD lazily once, preserves all11 prior SVGs and exposes accepted complete pages',()=>{
+test('Reference settles current No14 lazily once, preserves all11 prior SVGs and exposes the exact selected Round81 pages',()=>{
  const solves:string[]=[];setLayoutJankoScoreObserver(score=>solves.push(score.id??''));
  try{
   const config=createStudioConfig();const no14Id=config.scores[NO14_GOLD_REFERENCE_ID].score.id;
@@ -43,14 +45,17 @@ test('Reference settles GOLD lazily once, preserves all11 prior SVGs and exposes
   const html=renderReferenceView(config);
   assert.equal(solves.filter(id=>id===no14Id).length,1,'audit/count/pages/crops share one settled layout');
   const svgs=[...html.matchAll(/<svg\b[\s\S]*?<\/svg>/g)].map(m=>m[0]);
-  assert.equal(svgs.length,19);assert.deepEqual(svgs.slice(8).map(hash),oldReferenceHashes,'all prior canonical page/crop vectors remain exact');
-  assert.deepEqual(svgs.slice(0,4).map(hash),NO14_GOLD_IDENTITY.pageSvgSha256);
+  assert.equal(svgs.length,18);assert.deepEqual(svgs.slice(7).map(hash),oldReferenceHashes,'all prior canonical page/crop vectors remain exact');
+  assert.deepEqual(svgs.slice(0,3).map(hash),NO14_PUBLISHED_IDENTITY.pageSvgSha256);
+  assert.deepEqual(no14PublishedProfile(),no14GestureOpenProfile(),'publication adopts the accepted candidate without any profile or ink delta');
+  assert.equal(hash(JSON.stringify(no14PublishedProfile())),NO14_PUBLISHED_IDENTITY.profileSha256);assert.equal(hash(JSON.stringify(no14PublishedProfile().score)),NO14_PUBLISHED_IDENTITY.modelSha256);
   assert.match(svgs[0],/Album für die Jugend · Op\. 68/);assert.match(svgs[0],/No\. 14 · Kleine Studie/);
-  for(const svg of svgs.slice(1,4)){assert.match(svg,/class="janko-running-head"/);assert.match(svg,/Album für die Jugend · Op\. 68/);assert.match(svg,/No\. 14 · Kleine Studie/);}
+  for(const svg of svgs.slice(1,3)){assert.match(svg,/class="janko-running-head"/);assert.match(svg,/Album für die Jugend · Op\. 68/);assert.match(svg,/No\. 14 · Kleine Studie/);}
   const no14=html.slice(0,html.indexOf('data-score="brahms-op118-no1"'));
   assert.match(no14,/Robert Schumann/);assert.match(no14,/No\. 14 · Kleine Studie/);assert.doesNotMatch(no14,/Variatio 1|draft|Practice candidate/);
   assert.match(no14,/schumann-op68-no14-gold\.pdf" download/);assert.match(no14,/data-lint-ok="true"/);assert.match(no14,/0 violations, 0 warnings/);
-  assert.deepEqual([...no14.matchAll(/data-page="(\d+)"/g)].map(m=>Number(m[1])),[1,2,3,4]);
+  assert.deepEqual([...no14.matchAll(/data-page="(\d+)"/g)].map(m=>Number(m[1])),[1,2,3]);
+  assert.doesNotMatch(svgs.slice(0,3).join(''),/Study ·|gesture-relative reading|class="janko-dynamic"/);
  }finally{setLayoutJankoScoreObserver(null);}
 });
 
@@ -88,30 +93,30 @@ test('compact running headers preserve page1 music and every later complete syst
  assert.throws(()=>assertSystemSvgTranslation(original,original.replace('Robert Schumann','foreign')+'<path d="M 0 0 L 1 1"/>',0,'extra ink'));
 });
 
-test('published GOLD PDF is fresh, matches accepted page ink and has four complete vector pages with font/source notices',()=>{
+test('published No14 PDF is fresh, matches selected Round81 ink and has three complete vector pages with font/source notices',()=>{
  const publicPdf='public/schumann-op68-no14-gold.pdf',dir=mkdtempSync(join(tmpdir(),'no14-gold-freshness-'));
  try{
   const fresh=join(dir,'gold.pdf');execFileSync(process.execPath,['--import','tsx','scripts/export-no14-practice-pdf.ts','--profile','gold','--out',fresh],{stdio:'pipe'});
   const current=JSON.parse(readFileSync(publicPdf+'.manifest.json','utf8')),regenerated=JSON.parse(readFileSync(fresh+'.manifest.json','utf8'));
-  assert.equal(current.pdfSha256,hash(readFileSync(publicPdf)));assert.equal(current.pages,4);assert.equal(current.notes,383);assert.equal(current.augmentationDots.length,4);
-  assert.equal(current.modelSha256,NO14_GOLD_IDENTITY.modelSha256);assert.equal(current.profileSha256,NO14_GOLD_IDENTITY.profileSha256);
-  assert.deepEqual(current.acceptedOrigin,NO14_GOLD_ACCEPTANCE);assert.deepEqual(current.acceptedPageSvgSha256,NO14_GOLD_ACCEPTANCE.pageSvgSha256);
-  assert.deepEqual(current.studioPageSvgSha256,NO14_GOLD_IDENTITY.pageSvgSha256);
-  assert.deepEqual(current.studioPageSvgSha256,regenerated.studioPageSvgSha256);assert.deepEqual(current.printChanges,NO14_GOLD_IDENTITY.printChanges);
+  assert.equal(current.pdfSha256,hash(readFileSync(publicPdf)));assert.equal(current.pages,3);assert.equal(current.notes,383);assert.equal(current.augmentationDots.length,4);
+  assert.equal(current.modelSha256,NO14_PUBLISHED_IDENTITY.modelSha256);assert.equal(current.profileSha256,NO14_PUBLISHED_IDENTITY.profileSha256);
+  assert.deepEqual(current.acceptedOrigin,NO14_PUBLISHED_IDENTITY);assert.deepEqual(current.acceptedPageSvgSha256,NO14_PUBLISHED_IDENTITY.pageSvgSha256);
+  assert.deepEqual(current.studioPageSvgSha256,NO14_PUBLISHED_IDENTITY.pageSvgSha256);
+  assert.deepEqual(current.studioPageSvgSha256,regenerated.studioPageSvgSha256);assert.deepEqual(current.printChanges,NO14_PUBLISHED_IDENTITY.printChanges);
   assert.deepEqual(current.pageSvgSha256,regenerated.pageSvgSha256);assert.deepEqual(current.performedMapping,regenerated.performedMapping);
   const fp=fingerprintPdf(publicPdf,'Album f'),freshFp=fingerprintPdf(fresh,'Album f');
   const {fonts:_publishedFonts,...publishedInk}=fp,{fonts:_freshFonts,...freshInk}=freshFp;
   // Only the environment-resolved names are excluded: text, every vector,
   // page dimensions, image count and96DPI scales remain exact cross-machine gates.
   assert.deepEqual(publishedInk,freshInk,'actual published content/geometry equals fresh selected export');
-  assert.equal(fp.pages,4);assert.equal(fp.images,0);assert.ok(fp.vectorNumbers.every(n=>n>1000));assert.ok(fp.fonts.some(f=>f.includes('URWGothic-Demi')));
+  assert.equal(fp.pages,3);assert.equal(fp.images,0);assert.ok(fp.vectorNumbers.every(n=>n>1000));assert.ok(fp.fonts.some(f=>f.includes('URWGothic-Demi')));
   assert.ok(fp.titleScales.some(n=>Math.abs(n-44/3)<.01));for(const size of fp.pageSizes)assert.equal(size,'595.28 x 841.89');
   for(const pdf of [publicPdf,fresh]){
    const fonts=execFileSync('pdffonts',[pdf],{encoding:'utf8'}).split('\n').slice(2).filter(Boolean);assert.ok(fonts.length>0&&fonts.every(line=>/yes\s+yes\s+yes/.test(line)),'all fonts embedded, subset andUnicode in each output');
    assert.ok(fingerprintPdf(pdf,'Kleine Studie').fonts.some(f=>f.includes('URWGothic-Demi')));
   }
   const text=execFileSync('pdftotext',[publicPdf,'-'],{encoding:'utf8'});assert.match(text,/Album für die Jugend/);assert.match(text,/Op\. 68/);assert.match(text,/No\. 14 · Kleine Studie/);assert.match(text,/Robert Schumann/);assert.match(text,/Leise und sehr egal zu spielen/);assert.match(text,/Philippe Hardy/);assert.match(text,/Free Art License/);assert.doesNotMatch(text,/Practice candidate|Variatio/);
-  assert.equal((text.match(/Page \d of 4/g)??[]).length,4);
+  assert.equal((text.match(/Page \d of 3/g)??[]).length,3);assert.doesNotMatch(text,/Study ·|gesture-relative reading/);
   const notices=readFileSync(publicPdf+'.notices.txt','utf8');assert.match(notices,/Libre Bodoni/);assert.match(notices,/SIL OPEN FONT LICENSE/);assert.match(notices,/Free Art License/);assert.match(notices,/URW/);assert.match(notices,/Upstream-Name: Noto/);assert.match(notices,/Upstream-Name: Liberation Fonts/);
  }finally{rmSync(dir,{recursive:true,force:true});}
 });

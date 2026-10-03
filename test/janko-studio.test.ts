@@ -333,7 +333,7 @@ test('renderReferenceView retains both complete page sets and macro data in the 
   assert.equal(brahmsCrops.length, BRAHMS_STUDIO_CROPS.length, 'macro data remains in the engine artifact; the reader hides it without changing engraving');
   assert.equal(
     (html.match(/<svg/g) ?? []).length,
-    bachPages.length + brahmsPages.length + bachCrops.length + brahmsCrops.length + 8
+    bachPages.length + brahmsPages.length + bachCrops.length + brahmsCrops.length + 7 // No14: three pages plus four crops.
   );
   for (const crop of BRAHMS_STUDIO_CROPS) {
     assert.ok(
@@ -412,16 +412,22 @@ test('Adding a candidate to the registry needs zero template edits', () => {
 test('The registry never imports engine internals',()=>{
  const root='src/render/janko/candidates.ts';
  const graph:Record<string,string[]>={
-  [root]:['src/source-review/documents.ts','src/render/janko/types.ts','src/render/janko/no14-practice.ts','src/render/janko/no14-written.ts'],
+  [root]:['src/source-review/documents.ts','src/render/janko/types.ts','src/render/janko/no14-practice.ts','src/render/janko/no14-written.ts','src/render/janko/no14-relative.ts','src/render/janko/no14-gesture-relative.ts'],
   'src/source-review/documents.ts':[],
   'src/render/janko/types.ts':[], // Existing shared API boundary; see binding checks below.
   'src/model/types.ts':[],
+  'src/render/janko/anchor-solver.ts':['src/model/types.ts'],
+  'src/render/janko/no14-relative.ts':['src/render/janko/no14-gold.ts','src/render/janko/types.ts','src/render/janko/anchor-solver.ts'],
+  'src/render/janko/no14-gesture-relative.ts':['src/render/janko/no14-gold.ts','src/render/janko/types.ts','src/render/janko/anchor-solver.ts','src/model/types.ts'],
+  'src/render/janko/no14-gold.ts':['src/render/janko/no14-gold-profile.json','src/render/janko/no14-written.ts','src/render/janko/types.ts'],
   'src/render/janko/no14-written.ts':['src/model/types.ts','src/scores/schumann-no14-draft.ts','src/render/janko/no14-practice.ts'],
   'src/render/janko/no14-practice.ts':['src/scores/schumann-no14-draft.ts','src/render/janko/types.ts'],
   'src/scores/schumann-no14-draft.ts':['src/scores/schumann-no14-derived.json','src/model/types.ts'],
  };
  const no14Bindings:Record<string,string[]>={
   './no14-written':['NO14_WRITTEN_SCORE_ID'],
+  './no14-relative':['NO14_RELATIVE_SCORE_ID','NO14_RELATIVE_BASELINE_ID'],
+  './no14-gesture-relative':['NO14_GESTURE_RELATIVE_ID','NO14_GESTURE_UNDERLINE_ID','NO14_GESTURE_REFINED_ID','NO14_GESTURE_CENTERED_ID','NO14_GESTURE_OPTICAL_ID','NO14_GESTURE_OPEN_ID'],
   './no14-practice':['NO14_PRACTICE_SCORE_ID','NO14_PRACTICE_DELTA','NO14_DOT_CONTROL_DELTA','NO14_HEAD_DOT_DELTA','NO14_FULLER_HAIRPIN_DELTA','NO14_OPTICAL_DELTA','NO14_FITTED_DELTA','NO14_BREATHING_DELTA','NO14_SILHOUETTE_DELTA'],
  };
  const audit=(load:(file:string)=>string)=>{
@@ -461,6 +467,8 @@ test('The registry never imports engine internals',()=>{
  const mutated=(file:string,extra:string)=>(target:string)=>read(target)+(target===file?'\n'+extra:'');
  assert.throws(()=>audit(mutated('src/render/janko/no14-practice.ts',"import {layoutJankoScore} from './engine';")),'transitive static engine import is rejected');
  assert.throws(()=>audit(mutated('src/render/janko/no14-written.ts',"void import('./engine');")),'transitive dynamic engine import is rejected');
+ assert.throws(()=>audit(mutated('src/render/janko/no14-relative.ts',"import {layoutJankoScore} from './engine';")),'relative source projection cannot import an engine');
+ assert.throws(()=>audit(mutated(root,"import {no14GestureOpenProfile} from './no14-gesture-relative';")),'registry consumes gesture identifiers, not builders');
  assert.throws(()=>audit(mutated(root,"import {projectNo14Written} from './no14-written';")),'registry must not consume source-building functions');
  assert.throws(()=>audit(mutated('src/render/janko/no14-practice.ts',"import {renderAbstractKeySvg} from './types';")),'new source/profile helpers cannot consume a renderer through the legacy types barrel');
 });

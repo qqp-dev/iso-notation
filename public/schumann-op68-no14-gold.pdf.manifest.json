@@ -1,12 +1,12 @@
 {
-  "status": "operator-selected No14 GOLD",
+  "status": "operator-selected No14 Round81",
   "profile": "gold",
-  "sourceId": "schumann-op68-no14-written-practice",
+  "sourceId": "schumann-op68-no14-gesture-open",
   "sourceHash": "42aa471662af4d919f696b03e6b7b5b634a8e1f1310303aa6a92075c9b511533",
   "notes": 383,
   "writtenBars": 64,
   "unfoldedOccurrences": 96,
-  "pages": 4,
+  "pages": 3,
   "augmentationDots": [
     {
       "owners": [
@@ -14,8 +14,8 @@
       ],
       "shape": {
         "kind": "dot",
-        "cx": 429.98,
-        "cy": 734.71,
+        "cx": 482.06,
+        "cy": 716.81,
         "r": 0.75,
         "index": 1
       }
@@ -26,8 +26,8 @@
       ],
       "shape": {
         "kind": "dot",
-        "cx": 429.98,
-        "cy": 696.09,
+        "cx": 482.06,
+        "cy": 678.18,
         "r": 0.75,
         "index": 1
       }
@@ -38,8 +38,8 @@
       ],
       "shape": {
         "kind": "dot",
-        "cx": 501.5,
-        "cy": 728.59,
+        "cx": 527.53,
+        "cy": 710.68,
         "r": 0.75,
         "index": 1
       }
@@ -50,8 +50,8 @@
       ],
       "shape": {
         "kind": "dot",
-        "cx": 501.5,
-        "cy": 691.09,
+        "cx": 527.53,
+        "cy": 673.18,
         "r": 0.75,
         "index": 1
       }
@@ -59,7 +59,7 @@
   ],
   "options": {
     "clarityPass": true,
-    "measuresPerSystem": 4,
+    "measuresPerSystem": 6,
     "rhythmStyle": "beamed",
     "interStaffGap": 30,
     "middleCSpine": "none",
@@ -115,7 +115,7 @@
     "clusterCompression": "literal",
     "clusterPresentation": "literal",
     "verticalPlacement": "content-aware",
-    "pitchPlacement": "standard",
+    "pitchPlacement": "parity-columns",
     "durationEndpoint": "none",
     "chordSymbolScale": 1,
     "bracketDurationGrammar": "golden",
@@ -135,7 +135,7 @@
     "independentUnisonAttachments": true,
     "sharedHeadTerminal": "long",
     "sharedDurationDot": "head-adjacent",
-    "phraseRouting": "optical-silhouette",
+    "phraseRouting": "optical-open",
     "phraseTaper": "gentle",
     "completeFlagClearance": true,
     "phrasePlacement": "gesture-contour",
@@ -144,7 +144,17 @@
     "dynamicFamily": "libre-bodoni-italic",
     "pedalStart": "plain-text",
     "pedalTextFamily": "libre-bodoni-regular",
-    "runningHeaderHeight": 20
+    "runningHeaderHeight": 20,
+    "beatPulseTicks": 72,
+    "readingAnchorMark": "underline",
+    "readingUnderlineStroke": 0.65,
+    "readingUnderlineWidth": 4.6,
+    "productionWidthPolicy": "protected-heads",
+    "readingGlyphSeats": {
+      "1": -0.01625,
+      "B": -0.025
+    },
+    "authoredRestMode": "source"
   },
   "tokens": {
     "rowHeight": 15,
@@ -250,44 +260,51 @@
     "openOvalFlankFactor": 0.95
   },
   "pageSvgSha256": [
-    "27887f8ec301b8b9c4a507be630b9d875715df4fccdb0722db15e5abf76f44d7",
-    "5388486df3d217bbadac6bfb3fc4eb0543fb539354e2d7ed9c97510f30e3fd0a",
-    "b1767e8674cba482571a9cb00edd96e15c6de069df5ece325a230d906fe4e5e8",
-    "23dbd399721c47e4f9f32b7ebf0c50ba1a7de99fe97a1e657f63c66ab3788462"
+    "a6121049be265252902b3f29ad5e836e6bb9f24acc9911fae3b73fccd7c4b763",
+    "13350f95dad39b58b404bedbe5e4a4fb43b0fcfe16fed2a9e8c718bc1cfabebf",
+    "3e78661bf1d016a5df11f58713a07d5c25cec85c60026d1bda18a47e207185d1"
   ],
-  "pdfSha256": "81c9d35fedb350287b1606c5bb861762574b0687efbe1d72856df3dca0e48a30",
-  "modelSha256": "405d6b3db8ab82c2a232217a551ff29f2365b3a29c3f1f24349446d8b52a2414",
-  "profileSha256": "901bec1c5969f947fc800a404fa5ea6717abda0b0602f890e36d22b361cb0395",
+  "pdfSha256": "783ad267c3a780ddacbe1c512ec78b16d85a6ec18d8391b31810c26a2c975b60",
+  "modelSha256": "ba7b3d00e110291d964db977167f0e79401d883c8787ff70938cde74340b223b",
+  "profileSha256": "13d7ea49561d5d1e9644df3f8d3858278409bccb8a747ea2300a0026996af249",
   "acceptedOrigin": {
-    "candidateId": "no14-judgment-bodoni-auto",
-    "acceptedOn": "2026-10-02",
-    "modelSha256": "960bf3aa0e86a851f70842f056955c274567b994758338db5ca5ebbebbde4022",
-    "profileSha256": "b0fd839571e8ba35531bdfac84e46abb603b13c34e624fd29b5807ae8e2bf0b4",
-    "pageSvgSha256": [
-      "30fbddbf3d4e2813468a0e2f645d17d1229a6c5583f3bdabe8bb8d71488121c6",
-      "a6fdfeee09feb371adb00d1e2d5e4fabd365968ffbd33dd272ac6243ec829003",
-      "d7da9298cb41cce6148af2ab6809512479cd37215ce888c8b0fcd8af08ce5127",
-      "bf0959ce7a18c513da3daefdb9a6158f2aa103f873acb755f3c6a336e1911296"
-    ],
+    "candidateId": "no14-gesture-open",
+    "round": 81,
+    "acceptedOn": "2026-10-03",
+    "referenceId": "schumann-op68-no14-gold",
+    "pdf": "schumann-op68-no14-gold.pdf",
     "sourceSha256": "42aa471662af4d919f696b03e6b7b5b634a8e1f1310303aa6a92075c9b511533",
-    "performedModelSha256": "cf0f72017ab3d1eb1c5544186ef6582894d01a0c07916f0719875f8e04db395a"
+    "modelSha256": "ba7b3d00e110291d964db977167f0e79401d883c8787ff70938cde74340b223b",
+    "profileSha256": "13d7ea49561d5d1e9644df3f8d3858278409bccb8a747ea2300a0026996af249",
+    "pageSvgSha256": [
+      "c7f777f12f8901dc56bc6010227586618bfa491acc9df35035f92d581720262c",
+      "e4b59108f8074a11dd97f6219f5790dbc3e28308760dda8ad1c1bed820879225",
+      "0eed9e5db2416bede05847582b7df70ad556518c20cef892dddc93a05b246d72"
+    ],
+    "printChanges": [
+      "Adopt operator-selected Round81 gesture-relative reading with125 underlined figure starts and final relative0.",
+      "Use the approved three-page protected-head layout and1/B optical seats.",
+      "Admit all five literal source ending rests and preserve their exact durations.",
+      "Omit two scalar piano indications absent from the inspected witness; retain the reversible edition correction ledger.",
+      "Use the complete work/opus/piece identity without study labels."
+    ]
   },
   "acceptedPageSvgSha256": [
-    "30fbddbf3d4e2813468a0e2f645d17d1229a6c5583f3bdabe8bb8d71488121c6",
-    "a6fdfeee09feb371adb00d1e2d5e4fabd365968ffbd33dd272ac6243ec829003",
-    "d7da9298cb41cce6148af2ab6809512479cd37215ce888c8b0fcd8af08ce5127",
-    "bf0959ce7a18c513da3daefdb9a6158f2aa103f873acb755f3c6a336e1911296"
+    "c7f777f12f8901dc56bc6010227586618bfa491acc9df35035f92d581720262c",
+    "e4b59108f8074a11dd97f6219f5790dbc3e28308760dda8ad1c1bed820879225",
+    "0eed9e5db2416bede05847582b7df70ad556518c20cef892dddc93a05b246d72"
   ],
   "studioPageSvgSha256": [
-    "44824dda68602c3dc783941e87b173498e3d06c1fc118eb32b822371daec775e",
-    "a6b23697412673fb6f8d35a4bd7ba778a680b4366a69455a49d4720fc393245a",
-    "1bce94458610c7292e5521fa7c77c225b273e66dce2ffcfb6cef67a8f98f887f",
-    "f84e9944e548e5df39568c3ed3dc2cac6c038ca776114e7e54620f33ec932e2f"
+    "c7f777f12f8901dc56bc6010227586618bfa491acc9df35035f92d581720262c",
+    "e4b59108f8074a11dd97f6219f5790dbc3e28308760dda8ad1c1bed820879225",
+    "0eed9e5db2416bede05847582b7df70ad556518c20cef892dddc93a05b246d72"
   ],
   "printChanges": [
-    "Remove only trailing Practice candidate. notice text.",
-    "Bind existing complete work/opus/piece/composer identity to written score.",
-    "Reserve20pt for continuation running headers; title-page66pt remains."
+    "Adopt operator-selected Round81 gesture-relative reading with125 underlined figure starts and final relative0.",
+    "Use the approved three-page protected-head layout and1/B optical seats.",
+    "Admit all five literal source ending rests and preserve their exact durations.",
+    "Omit two scalar piano indications absent from the inspected witness; retain the reversible edition correction ledger.",
+    "Use the complete work/opus/piece identity without study labels."
   ],
   "performedMapping": {
     "sourceScoreId": "schumann-op68-no14",
@@ -4425,78 +4442,51 @@
       "dynamics": [
         {
           "writtenIndex": 0,
-          "performedIndex": 0,
-          "overrides": {}
-        },
-        {
-          "writtenIndex": 1,
           "performedIndex": 1,
           "overrides": {}
         },
         {
-          "writtenIndex": 2,
+          "writtenIndex": 1,
           "performedIndex": 2,
           "overrides": {}
         },
         {
-          "writtenIndex": 3,
+          "writtenIndex": 2,
           "performedIndex": 3,
           "overrides": {}
         },
         {
-          "writtenIndex": 4,
+          "writtenIndex": 3,
           "performedIndex": 4,
           "overrides": {}
         },
         {
-          "writtenIndex": 5,
+          "writtenIndex": 4,
           "performedIndex": 5,
           "overrides": {}
         },
         {
-          "writtenIndex": 6,
-          "performedIndex": 6,
-          "overrides": {}
-        },
-        {
-          "writtenIndex": 7,
+          "writtenIndex": 5,
           "performedIndex": 7,
           "overrides": {}
         },
         {
-          "writtenIndex": 8,
+          "writtenIndex": 6,
           "performedIndex": 8,
           "overrides": {}
         },
         {
-          "writtenIndex": 9,
+          "writtenIndex": 7,
           "performedIndex": 9,
           "overrides": {}
         },
         {
-          "writtenIndex": 10,
+          "writtenIndex": 8,
           "performedIndex": 10,
           "overrides": {}
         },
         {
-          "writtenIndex": 6,
-          "performedIndex": 11,
-          "overrides": {
-            "tick": 9216,
-            "origin": {
-              "file": "14-Petite-etude.ly",
-              "line": 136,
-              "col": 69,
-              "bar": 32,
-              "context": "Dynamics_pf",
-              "occurrence": 2,
-              "time": "24",
-              "order": 10
-            }
-          }
-        },
-        {
-          "writtenIndex": 7,
+          "writtenIndex": 5,
           "performedIndex": 12,
           "overrides": {
             "tick": 10224,
@@ -4523,7 +4513,7 @@
           }
         },
         {
-          "writtenIndex": 8,
+          "writtenIndex": 6,
           "performedIndex": 13,
           "overrides": {
             "tick": 10512,
@@ -4550,7 +4540,7 @@
           }
         },
         {
-          "writtenIndex": 9,
+          "writtenIndex": 7,
           "performedIndex": 14,
           "overrides": {
             "tick": 10800,
@@ -4577,7 +4567,7 @@
           }
         },
         {
-          "writtenIndex": 10,
+          "writtenIndex": 8,
           "performedIndex": 15,
           "overrides": {
             "tick": 12096,
@@ -8195,5 +8185,2975 @@
         }
       ]
     }
-  }
+  },
+  "readingPresentation": {
+    "sourceScoreId": "schumann-op68-no14-written-practice",
+    "anchors": [
+      {
+        "bar": 1,
+        "tick": 0,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:185:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:185:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 1,
+        "tick": 72,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:187:9:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:187:9:lower:59:1"
+        ]
+      },
+      {
+        "bar": 2,
+        "tick": 144,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:192:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:192:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 2,
+        "tick": 216,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:194:9:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:194:9:lower:60:1"
+        ]
+      },
+      {
+        "bar": 3,
+        "tick": 288,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:199:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:199:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 3,
+        "tick": 360,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:201:9:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:201:9:lower:64:1"
+        ]
+      },
+      {
+        "bar": 4,
+        "tick": 432,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:206:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:206:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 4,
+        "tick": 504,
+        "pitch": 62,
+        "ownerId": "14-Petite-etude.ly:208:9:lower:62:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:208:9:lower:62:1"
+        ]
+      },
+      {
+        "bar": 5,
+        "tick": 576,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:213:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:213:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 5,
+        "tick": 648,
+        "pitch": 67,
+        "ownerId": "14-Petite-etude.ly:215:9:lower:67:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:215:9:lower:67:1"
+        ]
+      },
+      {
+        "bar": 6,
+        "tick": 720,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:220:9:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:220:9:lower:47:1"
+        ]
+      },
+      {
+        "bar": 6,
+        "tick": 792,
+        "pitch": 63,
+        "ownerId": "14-Petite-etude.ly:221:9:lower:63:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:221:9:lower:63:1"
+        ]
+      },
+      {
+        "bar": 7,
+        "tick": 864,
+        "pitch": 48,
+        "ownerId": "14-Petite-etude.ly:225:9:lower:48:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:225:9:lower:48:1"
+        ]
+      },
+      {
+        "bar": 7,
+        "tick": 936,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:226:9:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:226:9:lower:64:1"
+        ]
+      },
+      {
+        "bar": 8,
+        "tick": 1008,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:230:9:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:230:9:lower:47:1"
+        ]
+      },
+      {
+        "bar": 8,
+        "tick": 1080,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:231:9:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:231:9:lower:60:1"
+        ]
+      },
+      {
+        "bar": 9,
+        "tick": 1152,
+        "pitch": 45,
+        "ownerId": "14-Petite-etude.ly:237:9:lower:45:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:237:9:lower:45:1"
+        ]
+      },
+      {
+        "bar": 9,
+        "tick": 1224,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:239:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:239:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 10,
+        "tick": 1296,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:244:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:244:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 10,
+        "tick": 1368,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:246:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:246:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 11,
+        "tick": 1440,
+        "pitch": 42,
+        "ownerId": "14-Petite-etude.ly:251:9:lower:42:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:251:9:lower:42:1"
+        ]
+      },
+      {
+        "bar": 11,
+        "tick": 1512,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:253:9:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:253:9:lower:60:1"
+        ]
+      },
+      {
+        "bar": 12,
+        "tick": 1584,
+        "pitch": 44,
+        "ownerId": "14-Petite-etude.ly:258:9:lower:44:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:258:9:lower:44:1"
+        ]
+      },
+      {
+        "bar": 12,
+        "tick": 1656,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:260:9:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:260:9:lower:59:1"
+        ]
+      },
+      {
+        "bar": 13,
+        "tick": 1728,
+        "pitch": 45,
+        "ownerId": "14-Petite-etude.ly:265:9:lower:45:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:265:9:lower:45:1"
+        ]
+      },
+      {
+        "bar": 13,
+        "tick": 1800,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:267:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:267:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 14,
+        "tick": 1872,
+        "pitch": 36,
+        "ownerId": "14-Petite-etude.ly:272:9:lower:36:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:272:9:lower:36:1"
+        ]
+      },
+      {
+        "bar": 14,
+        "tick": 1944,
+        "pitch": 52,
+        "ownerId": "14-Petite-etude.ly:274:9:lower:52:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:274:9:lower:52:1"
+        ]
+      },
+      {
+        "bar": 15,
+        "tick": 2016,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:279:9:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:279:9:lower:38:1"
+        ]
+      },
+      {
+        "bar": 15,
+        "tick": 2088,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:281:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:281:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 16,
+        "tick": 2160,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:286:9:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:286:9:lower:38:1"
+        ]
+      },
+      {
+        "bar": 17,
+        "tick": 2304,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:293:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:293:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 17,
+        "tick": 2376,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:295:9:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:295:9:lower:59:1"
+        ]
+      },
+      {
+        "bar": 18,
+        "tick": 2448,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:300:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:300:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 18,
+        "tick": 2520,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:302:9:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:302:9:lower:60:1"
+        ]
+      },
+      {
+        "bar": 19,
+        "tick": 2592,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:307:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:307:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 19,
+        "tick": 2664,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:309:9:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:309:9:lower:64:1"
+        ]
+      },
+      {
+        "bar": 20,
+        "tick": 2736,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:314:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:314:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 20,
+        "tick": 2808,
+        "pitch": 62,
+        "ownerId": "14-Petite-etude.ly:316:9:lower:62:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:316:9:lower:62:1"
+        ]
+      },
+      {
+        "bar": 21,
+        "tick": 2880,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:321:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:321:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 21,
+        "tick": 2952,
+        "pitch": 67,
+        "ownerId": "14-Petite-etude.ly:323:9:lower:67:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:323:9:lower:67:1"
+        ]
+      },
+      {
+        "bar": 22,
+        "tick": 3024,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:329:9:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:329:9:lower:47:1"
+        ]
+      },
+      {
+        "bar": 22,
+        "tick": 3096,
+        "pitch": 63,
+        "ownerId": "14-Petite-etude.ly:330:9:lower:63:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:330:9:lower:63:1"
+        ]
+      },
+      {
+        "bar": 23,
+        "tick": 3168,
+        "pitch": 48,
+        "ownerId": "14-Petite-etude.ly:334:9:lower:48:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:334:9:lower:48:1"
+        ]
+      },
+      {
+        "bar": 23,
+        "tick": 3240,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:335:9:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:335:9:lower:64:1"
+        ]
+      },
+      {
+        "bar": 24,
+        "tick": 3312,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:339:9:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:339:9:lower:47:1"
+        ]
+      },
+      {
+        "bar": 24,
+        "tick": 3384,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:340:9:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:340:9:lower:60:1"
+        ]
+      },
+      {
+        "bar": 25,
+        "tick": 3456,
+        "pitch": 45,
+        "ownerId": "14-Petite-etude.ly:346:9:lower:45:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:346:9:lower:45:1"
+        ]
+      },
+      {
+        "bar": 25,
+        "tick": 3528,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:348:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:348:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 26,
+        "tick": 3600,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:353:9:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:353:9:lower:43:1"
+        ]
+      },
+      {
+        "bar": 26,
+        "tick": 3672,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:355:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:355:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 27,
+        "tick": 3744,
+        "pitch": 42,
+        "ownerId": "14-Petite-etude.ly:360:9:lower:42:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:360:9:lower:42:1"
+        ]
+      },
+      {
+        "bar": 27,
+        "tick": 3816,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:362:9:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:362:9:lower:60:1"
+        ]
+      },
+      {
+        "bar": 28,
+        "tick": 3888,
+        "pitch": 44,
+        "ownerId": "14-Petite-etude.ly:367:9:lower:44:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:367:9:lower:44:1"
+        ]
+      },
+      {
+        "bar": 28,
+        "tick": 3960,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:369:9:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:369:9:lower:59:1"
+        ]
+      },
+      {
+        "bar": 29,
+        "tick": 4032,
+        "pitch": 45,
+        "ownerId": "14-Petite-etude.ly:374:9:lower:45:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:374:9:lower:45:1"
+        ]
+      },
+      {
+        "bar": 29,
+        "tick": 4104,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:376:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:376:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 30,
+        "tick": 4176,
+        "pitch": 36,
+        "ownerId": "14-Petite-etude.ly:381:9:lower:36:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:381:9:lower:36:1"
+        ]
+      },
+      {
+        "bar": 30,
+        "tick": 4248,
+        "pitch": 52,
+        "ownerId": "14-Petite-etude.ly:383:9:lower:52:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:383:9:lower:52:1"
+        ]
+      },
+      {
+        "bar": 31,
+        "tick": 4320,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:388:9:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:388:9:lower:38:1"
+        ]
+      },
+      {
+        "bar": 31,
+        "tick": 4392,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:390:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:390:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 32,
+        "tick": 4464,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:395:9:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:395:9:lower:38:1"
+        ]
+      },
+      {
+        "bar": 32,
+        "tick": 4536,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:397:9:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:397:9:lower:57:1"
+        ]
+      },
+      {
+        "bar": 33,
+        "tick": 4608,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:405:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:405:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 33,
+        "tick": 4680,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:407:11:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:407:11:lower:57:1"
+        ]
+      },
+      {
+        "bar": 34,
+        "tick": 4752,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:412:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:412:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 34,
+        "tick": 4824,
+        "pitch": 55,
+        "ownerId": "14-Petite-etude.ly:414:11:lower:55:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:414:11:lower:55:1"
+        ]
+      },
+      {
+        "bar": 35,
+        "tick": 4896,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:419:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:419:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 35,
+        "tick": 4968,
+        "pitch": 54,
+        "ownerId": "14-Petite-etude.ly:421:11:lower:54:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:421:11:lower:54:1"
+        ]
+      },
+      {
+        "bar": 36,
+        "tick": 5040,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:426:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:426:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 36,
+        "tick": 5112,
+        "pitch": 52,
+        "ownerId": "14-Petite-etude.ly:428:11:lower:52:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:428:11:lower:52:1"
+        ]
+      },
+      {
+        "bar": 37,
+        "tick": 5184,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:433:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:433:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 37,
+        "tick": 5256,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:435:11:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:435:11:lower:60:1"
+        ]
+      },
+      {
+        "bar": 38,
+        "tick": 5328,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:440:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:440:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 38,
+        "tick": 5400,
+        "pitch": 56,
+        "ownerId": "14-Petite-etude.ly:442:11:lower:56:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:442:11:lower:56:1"
+        ]
+      },
+      {
+        "bar": 39,
+        "tick": 5472,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:447:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:447:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 39,
+        "tick": 5544,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:449:11:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:449:11:lower:57:1"
+        ]
+      },
+      {
+        "bar": 40,
+        "tick": 5616,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:454:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:454:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 40,
+        "tick": 5688,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:456:11:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:456:11:lower:59:1"
+        ]
+      },
+      {
+        "bar": 41,
+        "tick": 5760,
+        "pitch": 36,
+        "ownerId": "14-Petite-etude.ly:465:80:lower.\"1\":36:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:465:80:lower.\"1\":36:1"
+        ]
+      },
+      {
+        "bar": 41,
+        "tick": 5832,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:469:19:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:469:19:lower:64:1"
+        ]
+      },
+      {
+        "bar": 42,
+        "tick": 5904,
+        "pitch": 48,
+        "ownerId": "14-Petite-etude.ly:474:11:lower:48:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:474:11:lower:48:1"
+        ]
+      },
+      {
+        "bar": 42,
+        "tick": 5976,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:475:11:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:475:11:lower:57:1"
+        ]
+      },
+      {
+        "bar": 43,
+        "tick": 6048,
+        "pitch": 35,
+        "ownerId": "14-Petite-etude.ly:483:88:lower.\"1\":35:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:483:88:lower.\"1\":35:1"
+        ]
+      },
+      {
+        "bar": 43,
+        "tick": 6120,
+        "pitch": 62,
+        "ownerId": "14-Petite-etude.ly:487:20:lower:62:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:487:20:lower:62:1"
+        ]
+      },
+      {
+        "bar": 44,
+        "tick": 6192,
+        "pitch": 46,
+        "ownerId": "14-Petite-etude.ly:492:11:lower:46:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:492:11:lower:46:1"
+        ]
+      },
+      {
+        "bar": 44,
+        "tick": 6264,
+        "pitch": 55,
+        "ownerId": "14-Petite-etude.ly:493:11:lower:55:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:493:11:lower:55:1"
+        ]
+      },
+      {
+        "bar": 45,
+        "tick": 6336,
+        "pitch": 45,
+        "ownerId": "14-Petite-etude.ly:498:11:lower:45:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:498:11:lower:45:1"
+        ]
+      },
+      {
+        "bar": 45,
+        "tick": 6408,
+        "pitch": 54,
+        "ownerId": "14-Petite-etude.ly:500:11:lower:54:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:500:11:lower:54:1"
+        ]
+      },
+      {
+        "bar": 46,
+        "tick": 6480,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:505:11:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:505:11:lower:43:1"
+        ]
+      },
+      {
+        "bar": 46,
+        "tick": 6552,
+        "pitch": 55,
+        "ownerId": "14-Petite-etude.ly:507:11:lower:55:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:507:11:lower:55:1"
+        ]
+      },
+      {
+        "bar": 47,
+        "tick": 6624,
+        "pitch": 42,
+        "ownerId": "14-Petite-etude.ly:512:11:lower:42:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:512:11:lower:42:1"
+        ]
+      },
+      {
+        "bar": 47,
+        "tick": 6696,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:514:11:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:514:11:lower:57:1"
+        ]
+      },
+      {
+        "bar": 48,
+        "tick": 6768,
+        "pitch": 55,
+        "ownerId": "14-Petite-etude.ly:517:14:lower.0:55:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:1",
+          "14-Petite-etude.ly:517:34:lower.1:55:1"
+        ]
+      },
+      {
+        "bar": 48,
+        "tick": 6840,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:517:22:lower.0:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:1",
+          "14-Petite-etude.ly:517:41:lower.1:57:1"
+        ]
+      },
+      {
+        "bar": 49,
+        "tick": 6912,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:524:11:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:524:11:lower:43:1"
+        ]
+      },
+      {
+        "bar": 49,
+        "tick": 6984,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:526:11:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:526:11:lower:59:1"
+        ]
+      },
+      {
+        "bar": 50,
+        "tick": 7056,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:531:11:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:531:11:lower:43:1"
+        ]
+      },
+      {
+        "bar": 50,
+        "tick": 7128,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:533:11:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:533:11:lower:60:1"
+        ]
+      },
+      {
+        "bar": 51,
+        "tick": 7200,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:538:11:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:538:11:lower:43:1"
+        ]
+      },
+      {
+        "bar": 51,
+        "tick": 7272,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:540:11:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:540:11:lower:64:1"
+        ]
+      },
+      {
+        "bar": 52,
+        "tick": 7344,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:545:11:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:545:11:lower:43:1"
+        ]
+      },
+      {
+        "bar": 52,
+        "tick": 7416,
+        "pitch": 62,
+        "ownerId": "14-Petite-etude.ly:547:11:lower:62:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:547:11:lower:62:1"
+        ]
+      },
+      {
+        "bar": 53,
+        "tick": 7488,
+        "pitch": 43,
+        "ownerId": "14-Petite-etude.ly:552:11:lower:43:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:552:11:lower:43:1"
+        ]
+      },
+      {
+        "bar": 53,
+        "tick": 7560,
+        "pitch": 67,
+        "ownerId": "14-Petite-etude.ly:554:11:lower:67:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:554:11:lower:67:1"
+        ]
+      },
+      {
+        "bar": 54,
+        "tick": 7632,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:560:11:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:560:11:lower:47:1"
+        ]
+      },
+      {
+        "bar": 54,
+        "tick": 7704,
+        "pitch": 63,
+        "ownerId": "14-Petite-etude.ly:561:11:lower:63:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:561:11:lower:63:1"
+        ]
+      },
+      {
+        "bar": 55,
+        "tick": 7776,
+        "pitch": 48,
+        "ownerId": "14-Petite-etude.ly:565:11:lower:48:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:565:11:lower:48:1"
+        ]
+      },
+      {
+        "bar": 55,
+        "tick": 7848,
+        "pitch": 64,
+        "ownerId": "14-Petite-etude.ly:566:11:lower:64:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:566:11:lower:64:1"
+        ]
+      },
+      {
+        "bar": 56,
+        "tick": 7920,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:571:11:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:571:11:lower:47:1"
+        ]
+      },
+      {
+        "bar": 56,
+        "tick": 7992,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:573:11:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:573:11:lower:59:1"
+        ]
+      },
+      {
+        "bar": 57,
+        "tick": 8064,
+        "pitch": 45,
+        "ownerId": "14-Petite-etude.ly:578:11:lower:45:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:578:11:lower:45:1"
+        ]
+      },
+      {
+        "bar": 57,
+        "tick": 8136,
+        "pitch": 60,
+        "ownerId": "14-Petite-etude.ly:580:11:lower:60:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:580:11:lower:60:1"
+        ]
+      },
+      {
+        "bar": 58,
+        "tick": 8208,
+        "pitch": 47,
+        "ownerId": "14-Petite-etude.ly:585:11:lower:47:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:585:11:lower:47:1"
+        ]
+      },
+      {
+        "bar": 58,
+        "tick": 8280,
+        "pitch": 56,
+        "ownerId": "14-Petite-etude.ly:587:11:lower:56:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:587:11:lower:56:1"
+        ]
+      },
+      {
+        "bar": 59,
+        "tick": 8352,
+        "pitch": 36,
+        "ownerId": "14-Petite-etude.ly:592:11:lower:36:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:592:11:lower:36:1"
+        ]
+      },
+      {
+        "bar": 59,
+        "tick": 8424,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:594:11:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:594:11:lower:57:1"
+        ]
+      },
+      {
+        "bar": 60,
+        "tick": 8496,
+        "pitch": 37,
+        "ownerId": "14-Petite-etude.ly:599:11:lower:37:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:599:11:lower:37:1"
+        ]
+      },
+      {
+        "bar": 60,
+        "tick": 8568,
+        "pitch": 52,
+        "ownerId": "14-Petite-etude.ly:601:11:lower:52:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:601:11:lower:52:1"
+        ]
+      },
+      {
+        "bar": 61,
+        "tick": 8640,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:606:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:606:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 61,
+        "tick": 8712,
+        "pitch": 57,
+        "ownerId": "14-Petite-etude.ly:608:11:lower:57:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:608:11:lower:57:1"
+        ]
+      },
+      {
+        "bar": 62,
+        "tick": 8784,
+        "pitch": 38,
+        "ownerId": "14-Petite-etude.ly:613:11:lower:38:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:613:11:lower:38:1"
+        ]
+      },
+      {
+        "bar": 62,
+        "tick": 8856,
+        "pitch": 59,
+        "ownerId": "14-Petite-etude.ly:615:11:lower:59:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:615:11:lower:59:1"
+        ]
+      },
+      {
+        "bar": 63,
+        "tick": 8928,
+        "pitch": 31,
+        "ownerId": "14-Petite-etude.ly:622:97:lower.\"1\":31:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:622:97:lower.\"1\":31:1"
+        ]
+      },
+      {
+        "bar": 63,
+        "tick": 9000,
+        "pitch": 55,
+        "ownerId": "14-Petite-etude.ly:627:11:lower:55:1",
+        "ownerIds": [
+          "14-Petite-etude.ly:627:11:lower:55:1"
+        ]
+      }
+    ],
+    "groups": [
+      {
+        "id": "gesture-1-0-hand-figure",
+        "bar": 1,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:185:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:185:9:lower:43:1",
+          "14-Petite-etude.ly:185:16:lower:47:1",
+          "14-Petite-etude.ly:185:18:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-1-72-hand-figure",
+        "bar": 1,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:187:9:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:187:9:lower:59:1",
+          "14-Petite-etude.ly:187:15:lower:55:1",
+          "14-Petite-etude.ly:187:17:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-2-0-hand-figure",
+        "bar": 2,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:192:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:192:9:lower:43:1",
+          "14-Petite-etude.ly:192:17:lower:48:1",
+          "14-Petite-etude.ly:192:19:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-2-72-hand-figure",
+        "bar": 2,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:194:9:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:194:9:lower:60:1",
+          "14-Petite-etude.ly:194:15:lower:55:1",
+          "14-Petite-etude.ly:194:17:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-3-0-hand-figure",
+        "bar": 3,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:199:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:199:9:lower:43:1",
+          "14-Petite-etude.ly:199:17:lower:48:1",
+          "14-Petite-etude.ly:199:19:lower:54:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-3-72-hand-figure",
+        "bar": 3,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:201:9:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:201:9:lower:64:1",
+          "14-Petite-etude.ly:201:15:lower:60:1",
+          "14-Petite-etude.ly:201:17:lower:57:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-4-0-hand-figure",
+        "bar": 4,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:206:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:206:9:lower:43:1",
+          "14-Petite-etude.ly:206:15:lower:47:1",
+          "14-Petite-etude.ly:206:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-4-72-hand-figure",
+        "bar": 4,
+        "referencePitch": 62,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:208:9:lower:62:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:208:9:lower:62:1",
+          "14-Petite-etude.ly:208:15:lower:59:1",
+          "14-Petite-etude.ly:208:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-5-0-hand-figure",
+        "bar": 5,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:213:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:213:9:lower:43:1",
+          "14-Petite-etude.ly:213:15:lower:47:1",
+          "14-Petite-etude.ly:213:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-5-72-hand-figure",
+        "bar": 5,
+        "referencePitch": 67,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:215:9:lower:67:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:215:9:lower:67:1",
+          "14-Petite-etude.ly:215:15:lower:62:1",
+          "14-Petite-etude.ly:215:17:lower:59:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-6-0-hand-figure",
+        "bar": 6,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:220:9:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:220:9:lower:47:1",
+          "14-Petite-etude.ly:220:17:lower:51:1",
+          "14-Petite-etude.ly:220:21:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-6-72-hand-figure",
+        "bar": 6,
+        "referencePitch": 63,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:221:9:lower:63:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:221:9:lower:63:1",
+          "14-Petite-etude.ly:221:17:lower:59:1",
+          "14-Petite-etude.ly:221:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-7-0-hand-figure",
+        "bar": 7,
+        "referencePitch": 48,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:225:9:lower:48:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:225:9:lower:48:1",
+          "14-Petite-etude.ly:225:17:lower:52:1",
+          "14-Petite-etude.ly:225:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-7-72-hand-figure",
+        "bar": 7,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:226:9:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:226:9:lower:64:1",
+          "14-Petite-etude.ly:226:13:lower:60:1",
+          "14-Petite-etude.ly:226:15:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-8-0-hand-figure",
+        "bar": 8,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:230:9:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:230:9:lower:47:1",
+          "14-Petite-etude.ly:230:17:lower:48:1",
+          "14-Petite-etude.ly:230:19:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-8-72-hand-figure",
+        "bar": 8,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:231:9:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:231:9:lower:60:1",
+          "14-Petite-etude.ly:231:13:lower:55:1",
+          "14-Petite-etude.ly:231:15:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-9-0-hand-figure",
+        "bar": 9,
+        "referencePitch": 45,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:237:9:lower:45:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:237:9:lower:45:1",
+          "14-Petite-etude.ly:237:17:lower:48:1",
+          "14-Petite-etude.ly:237:19:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-9-72-hand-figure",
+        "bar": 9,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:239:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:239:9:lower:57:1",
+          "14-Petite-etude.ly:239:12:lower:52:1",
+          "14-Petite-etude.ly:239:14:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-10-0-hand-figure",
+        "bar": 10,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:244:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:244:9:lower:43:1",
+          "14-Petite-etude.ly:244:16:lower:48:1",
+          "14-Petite-etude.ly:244:18:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-10-72-hand-figure",
+        "bar": 10,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:246:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:246:9:lower:57:1",
+          "14-Petite-etude.ly:246:12:lower:52:1",
+          "14-Petite-etude.ly:246:14:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-11-0-hand-figure",
+        "bar": 11,
+        "referencePitch": 42,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:251:9:lower:42:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:251:9:lower:42:1",
+          "14-Petite-etude.ly:251:19:lower:45:1",
+          "14-Petite-etude.ly:251:21:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-11-72-hand-figure",
+        "bar": 11,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:253:9:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:253:9:lower:60:1",
+          "14-Petite-etude.ly:253:13:lower:57:1",
+          "14-Petite-etude.ly:253:15:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-12-0-hand-figure",
+        "bar": 12,
+        "referencePitch": 44,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:258:9:lower:44:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:258:9:lower:44:1",
+          "14-Petite-etude.ly:258:17:lower:47:1",
+          "14-Petite-etude.ly:258:19:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-12-72-hand-figure",
+        "bar": 12,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:260:9:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:260:9:lower:59:1",
+          "14-Petite-etude.ly:260:13:lower:53:1",
+          "14-Petite-etude.ly:260:16:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-13-0-hand-figure",
+        "bar": 13,
+        "referencePitch": 45,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:265:9:lower:45:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:265:9:lower:45:1",
+          "14-Petite-etude.ly:265:14:lower:48:1",
+          "14-Petite-etude.ly:265:16:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-13-72-hand-figure",
+        "bar": 13,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:267:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:267:9:lower:57:1",
+          "14-Petite-etude.ly:267:12:lower:52:1",
+          "14-Petite-etude.ly:267:14:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-14-0-hand-figure",
+        "bar": 14,
+        "referencePitch": 36,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:272:9:lower:36:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:272:9:lower:36:1",
+          "14-Petite-etude.ly:272:15:lower:43:1",
+          "14-Petite-etude.ly:272:18:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-14-72-hand-figure",
+        "bar": 14,
+        "referencePitch": 52,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:274:9:lower:52:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:274:9:lower:52:1",
+          "14-Petite-etude.ly:274:13:lower:45:1",
+          "14-Petite-etude.ly:274:16:lower:43:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-15-0-hand-figure",
+        "bar": 15,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:279:9:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:279:9:lower:38:1",
+          "14-Petite-etude.ly:279:14:lower:42:1",
+          "14-Petite-etude.ly:279:18:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-15-72-hand-figure",
+        "bar": 15,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:281:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:281:9:lower:57:1",
+          "14-Petite-etude.ly:281:13:lower:50:1",
+          "14-Petite-etude.ly:281:16:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-16-0-continuous-cross-hand",
+        "bar": 16,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:286:9:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:286:9:lower:38:1",
+          "14-Petite-etude.ly:286:15:lower:42:1",
+          "14-Petite-etude.ly:286:19:lower:46:1",
+          "14-Petite-etude.ly:288:9:lower:50:1",
+          "14-Petite-etude.ly:288:12:lower:54:1",
+          "14-Petite-etude.ly:288:16:lower:58:1"
+        ],
+        "kind": "continuous-cross-hand"
+      },
+      {
+        "id": "gesture-17-0-hand-figure",
+        "bar": 17,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:293:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:293:9:lower:43:1",
+          "14-Petite-etude.ly:293:17:lower:47:1",
+          "14-Petite-etude.ly:293:19:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-17-72-hand-figure",
+        "bar": 17,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:295:9:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:295:9:lower:59:1",
+          "14-Petite-etude.ly:295:15:lower:55:1",
+          "14-Petite-etude.ly:295:17:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-18-0-hand-figure",
+        "bar": 18,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:300:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:300:9:lower:43:1",
+          "14-Petite-etude.ly:300:15:lower:48:1",
+          "14-Petite-etude.ly:300:17:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-18-72-hand-figure",
+        "bar": 18,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:302:9:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:302:9:lower:60:1",
+          "14-Petite-etude.ly:302:13:lower:55:1",
+          "14-Petite-etude.ly:302:15:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-19-0-hand-figure",
+        "bar": 19,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:307:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:307:9:lower:43:1",
+          "14-Petite-etude.ly:307:15:lower:48:1",
+          "14-Petite-etude.ly:307:17:lower:54:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-19-72-hand-figure",
+        "bar": 19,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:309:9:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:309:9:lower:64:1",
+          "14-Petite-etude.ly:309:15:lower:60:1",
+          "14-Petite-etude.ly:309:17:lower:57:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-20-0-hand-figure",
+        "bar": 20,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:314:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:314:9:lower:43:1",
+          "14-Petite-etude.ly:314:15:lower:47:1",
+          "14-Petite-etude.ly:314:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-20-72-hand-figure",
+        "bar": 20,
+        "referencePitch": 62,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:316:9:lower:62:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:316:9:lower:62:1",
+          "14-Petite-etude.ly:316:13:lower:59:1",
+          "14-Petite-etude.ly:316:15:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-21-0-hand-figure",
+        "bar": 21,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:321:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:321:9:lower:43:1",
+          "14-Petite-etude.ly:321:15:lower:47:1",
+          "14-Petite-etude.ly:321:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-21-72-hand-figure",
+        "bar": 21,
+        "referencePitch": 67,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:323:9:lower:67:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:323:9:lower:67:1",
+          "14-Petite-etude.ly:323:13:lower:62:1",
+          "14-Petite-etude.ly:323:15:lower:59:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-22-0-hand-figure",
+        "bar": 22,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:329:9:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:329:9:lower:47:1",
+          "14-Petite-etude.ly:329:17:lower:51:1",
+          "14-Petite-etude.ly:329:21:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-22-72-hand-figure",
+        "bar": 22,
+        "referencePitch": 63,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:330:9:lower:63:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:330:9:lower:63:1",
+          "14-Petite-etude.ly:330:17:lower:59:1",
+          "14-Petite-etude.ly:330:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-23-0-hand-figure",
+        "bar": 23,
+        "referencePitch": 48,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:334:9:lower:48:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:334:9:lower:48:1",
+          "14-Petite-etude.ly:334:15:lower:52:1",
+          "14-Petite-etude.ly:334:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-23-72-hand-figure",
+        "bar": 23,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:335:9:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:335:9:lower:64:1",
+          "14-Petite-etude.ly:335:13:lower:60:1",
+          "14-Petite-etude.ly:335:15:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-24-0-hand-figure",
+        "bar": 24,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:339:9:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:339:9:lower:47:1",
+          "14-Petite-etude.ly:339:17:lower:48:1",
+          "14-Petite-etude.ly:339:19:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-24-72-hand-figure",
+        "bar": 24,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:340:9:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:340:9:lower:60:1",
+          "14-Petite-etude.ly:340:13:lower:55:1",
+          "14-Petite-etude.ly:340:15:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-25-0-hand-figure",
+        "bar": 25,
+        "referencePitch": 45,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:346:9:lower:45:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:346:9:lower:45:1",
+          "14-Petite-etude.ly:346:17:lower:48:1",
+          "14-Petite-etude.ly:346:19:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-25-72-hand-figure",
+        "bar": 25,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:348:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:348:9:lower:57:1",
+          "14-Petite-etude.ly:348:12:lower:52:1",
+          "14-Petite-etude.ly:348:14:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-26-0-hand-figure",
+        "bar": 26,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:353:9:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:353:9:lower:43:1",
+          "14-Petite-etude.ly:353:16:lower:48:1",
+          "14-Petite-etude.ly:353:18:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-26-72-hand-figure",
+        "bar": 26,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:355:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:355:9:lower:57:1",
+          "14-Petite-etude.ly:355:12:lower:52:1",
+          "14-Petite-etude.ly:355:14:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-27-0-hand-figure",
+        "bar": 27,
+        "referencePitch": 42,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:360:9:lower:42:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:360:9:lower:42:1",
+          "14-Petite-etude.ly:360:19:lower:45:1",
+          "14-Petite-etude.ly:360:21:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-27-72-hand-figure",
+        "bar": 27,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:362:9:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:362:9:lower:60:1",
+          "14-Petite-etude.ly:362:13:lower:57:1",
+          "14-Petite-etude.ly:362:15:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-28-0-hand-figure",
+        "bar": 28,
+        "referencePitch": 44,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:367:9:lower:44:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:367:9:lower:44:1",
+          "14-Petite-etude.ly:367:17:lower:47:1",
+          "14-Petite-etude.ly:367:19:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-28-72-hand-figure",
+        "bar": 28,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:369:9:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:369:9:lower:59:1",
+          "14-Petite-etude.ly:369:13:lower:53:1",
+          "14-Petite-etude.ly:369:16:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-29-0-hand-figure",
+        "bar": 29,
+        "referencePitch": 45,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:374:9:lower:45:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:374:9:lower:45:1",
+          "14-Petite-etude.ly:374:14:lower:48:1",
+          "14-Petite-etude.ly:374:16:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-29-72-hand-figure",
+        "bar": 29,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:376:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:376:9:lower:57:1",
+          "14-Petite-etude.ly:376:12:lower:52:1",
+          "14-Petite-etude.ly:376:14:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-30-0-hand-figure",
+        "bar": 30,
+        "referencePitch": 36,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:381:9:lower:36:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:381:9:lower:36:1",
+          "14-Petite-etude.ly:381:15:lower:43:1",
+          "14-Petite-etude.ly:381:18:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-30-72-hand-figure",
+        "bar": 30,
+        "referencePitch": 52,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:383:9:lower:52:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:383:9:lower:52:1",
+          "14-Petite-etude.ly:383:13:lower:45:1",
+          "14-Petite-etude.ly:383:16:lower:43:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-31-0-hand-figure",
+        "bar": 31,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:388:9:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:388:9:lower:38:1",
+          "14-Petite-etude.ly:388:14:lower:43:1",
+          "14-Petite-etude.ly:388:16:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-31-72-hand-figure",
+        "bar": 31,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:390:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:390:9:lower:57:1",
+          "14-Petite-etude.ly:390:13:lower:50:1",
+          "14-Petite-etude.ly:390:16:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-32-0-hand-figure",
+        "bar": 32,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:395:9:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:395:9:lower:38:1",
+          "14-Petite-etude.ly:395:15:lower:42:1",
+          "14-Petite-etude.ly:395:19:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-32-72-hand-figure",
+        "bar": 32,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:397:9:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:397:9:lower:57:1",
+          "14-Petite-etude.ly:397:13:lower:50:1",
+          "14-Petite-etude.ly:397:16:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-33-0-hand-figure",
+        "bar": 33,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:405:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:405:11:lower:38:1",
+          "14-Petite-etude.ly:405:17:lower:42:1",
+          "14-Petite-etude.ly:405:23:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-33-72-hand-figure",
+        "bar": 33,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:407:11:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:407:11:lower:57:1",
+          "14-Petite-etude.ly:407:15:lower:50:1",
+          "14-Petite-etude.ly:407:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-34-0-hand-figure",
+        "bar": 34,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:412:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:412:11:lower:38:1",
+          "14-Petite-etude.ly:412:17:lower:40:1",
+          "14-Petite-etude.ly:412:21:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-34-72-hand-figure",
+        "bar": 34,
+        "referencePitch": 55,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:414:11:lower:55:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:414:11:lower:55:1",
+          "14-Petite-etude.ly:414:17:lower:50:1",
+          "14-Petite-etude.ly:414:19:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-35-0-hand-figure",
+        "bar": 35,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:419:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:419:11:lower:38:1",
+          "14-Petite-etude.ly:419:17:lower:45:1",
+          "14-Petite-etude.ly:419:20:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-35-72-hand-figure",
+        "bar": 35,
+        "referencePitch": 54,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:421:11:lower:54:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:421:11:lower:54:1",
+          "14-Petite-etude.ly:421:18:lower:50:1",
+          "14-Petite-etude.ly:421:20:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-36-0-hand-figure",
+        "bar": 36,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:426:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:426:11:lower:38:1",
+          "14-Petite-etude.ly:426:17:lower:43:1",
+          "14-Petite-etude.ly:426:19:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-36-72-hand-figure",
+        "bar": 36,
+        "referencePitch": 52,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:428:11:lower:52:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:428:11:lower:52:1",
+          "14-Petite-etude.ly:428:16:lower:48:1",
+          "14-Petite-etude.ly:428:18:lower:43:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-37-0-hand-figure",
+        "bar": 37,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:433:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:433:11:lower:38:1",
+          "14-Petite-etude.ly:433:16:lower:42:1",
+          "14-Petite-etude.ly:433:20:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-37-72-hand-figure",
+        "bar": 37,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:435:11:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:435:11:lower:60:1",
+          "14-Petite-etude.ly:435:17:lower:50:1",
+          "14-Petite-etude.ly:435:20:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-38-0-hand-figure",
+        "bar": 38,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:440:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:440:11:lower:38:1",
+          "14-Petite-etude.ly:440:17:lower:41:1",
+          "14-Petite-etude.ly:440:23:lower:47:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-38-72-hand-figure",
+        "bar": 38,
+        "referencePitch": 56,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:442:11:lower:56:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:442:11:lower:56:1",
+          "14-Petite-etude.ly:442:19:lower:50:1",
+          "14-Petite-etude.ly:442:21:lower:47:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-39-0-hand-figure",
+        "bar": 39,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:447:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:447:11:lower:38:1",
+          "14-Petite-etude.ly:447:17:lower:42:1",
+          "14-Petite-etude.ly:447:21:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-39-72-hand-figure",
+        "bar": 39,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:449:11:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:449:11:lower:57:1",
+          "14-Petite-etude.ly:449:15:lower:50:1",
+          "14-Petite-etude.ly:449:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-40-0-hand-figure",
+        "bar": 40,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:454:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:454:11:lower:38:1",
+          "14-Petite-etude.ly:454:17:lower:41:1",
+          "14-Petite-etude.ly:454:20:lower:47:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-40-72-hand-figure",
+        "bar": 40,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:456:11:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:456:11:lower:59:1",
+          "14-Petite-etude.ly:456:17:lower:55:1",
+          "14-Petite-etude.ly:456:19:lower:53:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-41-0-hand-figure",
+        "bar": 41,
+        "referencePitch": 36,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:465:80:lower.\"1\":36:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:465:80:lower.\"1\":36:1",
+          "14-Petite-etude.ly:465:85:lower.\"1\":43:1",
+          "14-Petite-etude.ly:465:88:lower.\"1\":52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-41-72-hand-figure",
+        "bar": 41,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:469:19:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:469:19:lower:64:1",
+          "14-Petite-etude.ly:469:23:lower:60:1",
+          "14-Petite-etude.ly:469:25:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-42-0-hand-figure",
+        "bar": 42,
+        "referencePitch": 48,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:474:11:lower:48:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:474:11:lower:48:1",
+          "14-Petite-etude.ly:474:19:lower:51:1",
+          "14-Petite-etude.ly:474:24:lower:54:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-42-72-hand-figure",
+        "bar": 42,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:475:11:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:475:11:lower:57:1",
+          "14-Petite-etude.ly:475:16:lower:54:1",
+          "14-Petite-etude.ly:475:23:lower:51:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-43-0-hand-figure",
+        "bar": 43,
+        "referencePitch": 35,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:483:88:lower.\"1\":35:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:483:88:lower.\"1\":35:1",
+          "14-Petite-etude.ly:483:93:lower.\"1\":43:1",
+          "14-Petite-etude.ly:483:96:lower.\"1\":50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-43-72-hand-figure",
+        "bar": 43,
+        "referencePitch": 62,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:487:20:lower:62:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:487:20:lower:62:1",
+          "14-Petite-etude.ly:487:24:lower:59:1",
+          "14-Petite-etude.ly:487:26:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-44-0-hand-figure",
+        "bar": 44,
+        "referencePitch": 46,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:492:11:lower:46:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:492:11:lower:46:1",
+          "14-Petite-etude.ly:492:21:lower:49:1",
+          "14-Petite-etude.ly:492:25:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-44-72-hand-figure",
+        "bar": 44,
+        "referencePitch": 55,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:493:11:lower:55:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:493:11:lower:55:1",
+          "14-Petite-etude.ly:493:16:lower:52:1",
+          "14-Petite-etude.ly:493:20:lower:49:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-45-0-hand-figure",
+        "bar": 45,
+        "referencePitch": 45,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:498:11:lower:45:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:498:11:lower:45:1",
+          "14-Petite-etude.ly:498:18:lower:48:1",
+          "14-Petite-etude.ly:498:21:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-45-72-hand-figure",
+        "bar": 45,
+        "referencePitch": 54,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:500:11:lower:54:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:500:11:lower:54:1",
+          "14-Petite-etude.ly:500:18:lower:50:1",
+          "14-Petite-etude.ly:500:22:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-46-0-hand-figure",
+        "bar": 46,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:505:11:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:505:11:lower:43:1",
+          "14-Petite-etude.ly:505:18:lower:48:1",
+          "14-Petite-etude.ly:505:20:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-46-72-hand-figure",
+        "bar": 46,
+        "referencePitch": 55,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:507:11:lower:55:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:507:11:lower:55:1",
+          "14-Petite-etude.ly:507:16:lower:50:1",
+          "14-Petite-etude.ly:507:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-47-0-hand-figure",
+        "bar": 47,
+        "referencePitch": 42,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:512:11:lower:42:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:512:11:lower:42:1",
+          "14-Petite-etude.ly:512:21:lower:48:1",
+          "14-Petite-etude.ly:512:24:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-47-72-hand-figure",
+        "bar": 47,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:514:11:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:514:11:lower:57:1",
+          "14-Petite-etude.ly:514:15:lower:50:1",
+          "14-Petite-etude.ly:514:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-48-0-held-melody-figure",
+        "bar": 48,
+        "referencePitch": 55,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:1",
+          "14-Petite-etude.ly:517:34:lower.1:55:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:517:14:lower.0:55:1",
+          "14-Petite-etude.ly:517:34:lower.1:55:1",
+          "14-Petite-etude.ly:517:37:lower.1:50:1",
+          "14-Petite-etude.ly:517:39:lower.1:48:1"
+        ],
+        "kind": "held-melody-figure"
+      },
+      {
+        "id": "gesture-48-72-held-melody-figure",
+        "bar": 48,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:1",
+          "14-Petite-etude.ly:517:41:lower.1:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:517:22:lower.0:57:1",
+          "14-Petite-etude.ly:517:41:lower.1:57:1",
+          "14-Petite-etude.ly:517:44:lower.1:50:1",
+          "14-Petite-etude.ly:517:47:lower.1:48:1"
+        ],
+        "kind": "held-melody-figure"
+      },
+      {
+        "id": "gesture-49-0-hand-figure",
+        "bar": 49,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:524:11:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:524:11:lower:43:1",
+          "14-Petite-etude.ly:524:18:lower:47:1",
+          "14-Petite-etude.ly:524:20:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-49-72-hand-figure",
+        "bar": 49,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:526:11:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:526:11:lower:59:1",
+          "14-Petite-etude.ly:526:15:lower:55:1",
+          "14-Petite-etude.ly:526:17:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-50-0-hand-figure",
+        "bar": 50,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:531:11:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:531:11:lower:43:1",
+          "14-Petite-etude.ly:531:17:lower:48:1",
+          "14-Petite-etude.ly:531:19:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-50-72-hand-figure",
+        "bar": 50,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:533:11:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:533:11:lower:60:1",
+          "14-Petite-etude.ly:533:15:lower:55:1",
+          "14-Petite-etude.ly:533:17:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-51-0-hand-figure",
+        "bar": 51,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:538:11:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:538:11:lower:43:1",
+          "14-Petite-etude.ly:538:17:lower:48:1",
+          "14-Petite-etude.ly:538:19:lower:54:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-51-72-hand-figure",
+        "bar": 51,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:540:11:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:540:11:lower:64:1",
+          "14-Petite-etude.ly:540:15:lower:60:1",
+          "14-Petite-etude.ly:540:17:lower:57:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-52-0-hand-figure",
+        "bar": 52,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:545:11:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:545:11:lower:43:1",
+          "14-Petite-etude.ly:545:17:lower:47:1",
+          "14-Petite-etude.ly:545:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-52-72-hand-figure",
+        "bar": 52,
+        "referencePitch": 62,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:547:11:lower:62:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:547:11:lower:62:1",
+          "14-Petite-etude.ly:547:15:lower:59:1",
+          "14-Petite-etude.ly:547:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-53-0-hand-figure",
+        "bar": 53,
+        "referencePitch": 43,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:552:11:lower:43:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:552:11:lower:43:1",
+          "14-Petite-etude.ly:552:17:lower:47:1",
+          "14-Petite-etude.ly:552:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-53-72-hand-figure",
+        "bar": 53,
+        "referencePitch": 67,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:554:11:lower:67:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:554:11:lower:67:1",
+          "14-Petite-etude.ly:554:15:lower:62:1",
+          "14-Petite-etude.ly:554:17:lower:59:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-54-0-hand-figure",
+        "bar": 54,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:560:11:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:560:11:lower:47:1",
+          "14-Petite-etude.ly:560:17:lower:51:1",
+          "14-Petite-etude.ly:560:21:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-54-72-hand-figure",
+        "bar": 54,
+        "referencePitch": 63,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:561:11:lower:63:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:561:11:lower:63:1",
+          "14-Petite-etude.ly:561:17:lower:59:1",
+          "14-Petite-etude.ly:561:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-55-0-hand-figure",
+        "bar": 55,
+        "referencePitch": 48,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:565:11:lower:48:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:565:11:lower:48:1",
+          "14-Petite-etude.ly:565:17:lower:52:1",
+          "14-Petite-etude.ly:565:19:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-55-72-hand-figure",
+        "bar": 55,
+        "referencePitch": 64,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:566:11:lower:64:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:566:11:lower:64:1",
+          "14-Petite-etude.ly:566:15:lower:60:1",
+          "14-Petite-etude.ly:566:17:lower:55:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-56-0-hand-figure",
+        "bar": 56,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:571:11:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:571:11:lower:47:1",
+          "14-Petite-etude.ly:571:19:lower:50:1",
+          "14-Petite-etude.ly:571:21:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-56-72-hand-figure",
+        "bar": 56,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:573:11:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:573:11:lower:59:1",
+          "14-Petite-etude.ly:573:15:lower:56:1",
+          "14-Petite-etude.ly:573:19:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-57-0-hand-figure",
+        "bar": 57,
+        "referencePitch": 45,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:578:11:lower:45:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:578:11:lower:45:1",
+          "14-Petite-etude.ly:578:16:lower:48:1",
+          "14-Petite-etude.ly:578:18:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-57-72-hand-figure",
+        "bar": 57,
+        "referencePitch": 60,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:580:11:lower:60:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:580:11:lower:60:1",
+          "14-Petite-etude.ly:580:15:lower:57:1",
+          "14-Petite-etude.ly:580:17:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-58-0-hand-figure",
+        "bar": 58,
+        "referencePitch": 47,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:585:11:lower:47:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:585:11:lower:47:1",
+          "14-Petite-etude.ly:585:16:lower:50:1",
+          "14-Petite-etude.ly:585:18:lower:52:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-58-72-hand-figure",
+        "bar": 58,
+        "referencePitch": 56,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:587:11:lower:56:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:587:11:lower:56:1",
+          "14-Petite-etude.ly:587:16:lower:52:1",
+          "14-Petite-etude.ly:587:18:lower:50:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-59-0-hand-figure",
+        "bar": 59,
+        "referencePitch": 36,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:592:11:lower:36:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:592:11:lower:36:1",
+          "14-Petite-etude.ly:592:17:lower:40:1",
+          "14-Petite-etude.ly:592:19:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-59-72-hand-figure",
+        "bar": 59,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:594:11:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:594:11:lower:57:1",
+          "14-Petite-etude.ly:594:15:lower:52:1",
+          "14-Petite-etude.ly:594:17:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-60-0-hand-figure",
+        "bar": 60,
+        "referencePitch": 37,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:599:11:lower:37:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:599:11:lower:37:1",
+          "14-Petite-etude.ly:599:19:lower:43:1",
+          "14-Petite-etude.ly:599:22:lower:45:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-60-72-hand-figure",
+        "bar": 60,
+        "referencePitch": 52,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:601:11:lower:52:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:601:11:lower:52:1",
+          "14-Petite-etude.ly:601:15:lower:45:1",
+          "14-Petite-etude.ly:601:18:lower:43:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-61-0-hand-figure",
+        "bar": 61,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:606:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:606:11:lower:38:1",
+          "14-Petite-etude.ly:606:16:lower:43:1",
+          "14-Petite-etude.ly:606:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-61-72-hand-figure",
+        "bar": 61,
+        "referencePitch": 57,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:608:11:lower:57:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:608:11:lower:57:1",
+          "14-Petite-etude.ly:608:15:lower:50:1",
+          "14-Petite-etude.ly:608:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-62-0-hand-figure",
+        "bar": 62,
+        "referencePitch": 38,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:613:11:lower:38:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:613:11:lower:38:1",
+          "14-Petite-etude.ly:613:17:lower:42:1",
+          "14-Petite-etude.ly:613:21:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-62-72-hand-figure",
+        "bar": 62,
+        "referencePitch": 59,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:615:11:lower:59:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:615:11:lower:59:1",
+          "14-Petite-etude.ly:615:15:lower:50:1",
+          "14-Petite-etude.ly:615:18:lower:48:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-63-0-hand-figure",
+        "bar": 63,
+        "referencePitch": 31,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:622:97:lower.\"1\":31:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:622:97:lower.\"1\":31:1",
+          "14-Petite-etude.ly:622:102:lower.\"1\":38:1",
+          "14-Petite-etude.ly:622:105:lower.\"1\":47:1",
+          "14-Petite-etude.ly:630:11:lower:31:1"
+        ],
+        "kind": "hand-figure"
+      },
+      {
+        "id": "gesture-63-72-hand-figure",
+        "bar": 63,
+        "referencePitch": 55,
+        "anchorOwnerIds": [
+          "14-Petite-etude.ly:627:11:lower:55:1"
+        ],
+        "memberIds": [
+          "14-Petite-etude.ly:627:11:lower:55:1",
+          "14-Petite-etude.ly:627:15:lower:50:1",
+          "14-Petite-etude.ly:627:17:lower:47:1"
+        ],
+        "kind": "hand-figure"
+      }
+    ],
+    "target": "source-gesture-local-references",
+    "resets": 125
+  },
+  "editionCorrections": [
+    {
+      "kind": "omit-dynamic",
+      "reason": "Scalar piano is encoded but absent from the inspected Schuberth1848 witness; operator independently reports no piano in Henle1977 (operator evidence, not agent certification).",
+      "witness": "Schuberth & Co.,1848, plate1232, pp.16–17",
+      "original": {
+        "tick": 0,
+        "mark": "p",
+        "kind": "mark",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 99,
+          "col": 10,
+          "bar": 0,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "0",
+          "order": 0
+        }
+      },
+      "writtenIndex": 0,
+      "performedMappings": [
+        {
+          "writtenIndex": 0,
+          "performedIndex": 0,
+          "overrides": {}
+        }
+      ]
+    },
+    {
+      "kind": "omit-dynamic",
+      "reason": "Scalar piano is encoded but absent from the inspected Schuberth1848 witness; operator independently reports no piano in Henle1977 (operator evidence, not agent certification).",
+      "witness": "Schuberth & Co.,1848, plate1232, pp.16–17",
+      "original": {
+        "tick": 4608,
+        "mark": "p",
+        "parenthesized": true,
+        "kind": "mark",
+        "origin": {
+          "file": "14-Petite-etude.ly",
+          "line": 136,
+          "col": 69,
+          "bar": 32,
+          "context": "Dynamics_pf",
+          "occurrence": 1,
+          "time": "24",
+          "order": 10
+        }
+      },
+      "writtenIndex": 6,
+      "performedMappings": [
+        {
+          "writtenIndex": 6,
+          "performedIndex": 6,
+          "overrides": {}
+        },
+        {
+          "writtenIndex": 6,
+          "performedIndex": 11,
+          "overrides": {
+            "tick": 9216,
+            "origin": {
+              "file": "14-Petite-etude.ly",
+              "line": 136,
+              "col": 69,
+              "bar": 32,
+              "context": "Dynamics_pf",
+              "occurrence": 2,
+              "time": "24",
+              "order": 10
+            }
+          }
+        }
+      ]
+    }
+  ]
 }

@@ -1,7 +1,7 @@
 import {test} from 'node:test';
 import assert from 'node:assert/strict';
 import {readFileSync} from 'node:fs';
-import {opticalPhraseCandidates,weakShoulderHealth,routeOpticalPhrases} from '../src/render/janko/optical-phrases';
+import {opticalPhraseCandidates,weakShoulderHealth,opticalOpeningHealth,routeOpticalPhrases} from '../src/render/janko/optical-phrases';
 import {balancedBowIsCoherent} from '../src/render/janko/balanced-phrases';
 import {expressionIntersectsBox as referenceBox} from './support/expression-query-reference';
 import type {ExpressionInk,ExpressionPlacement} from '../src/render/janko/elements/expressions';
@@ -45,4 +45,17 @@ test('successor reuse separates old policy and invalidates actual source-domain 
  row.domain.end.y+=10;const mutated=routeOpticalPhrases(score,p,[row.base]);assert.deepEqual(mutated,routeOpticalPhrases(structuredClone(score),p,[row.base]));
  assert.notDeepEqual(mutated,routeOpticalPhrases(score,{...p,opticalDomain:()=>fixture.pools[0].domain},[row.base]));
  p.obstacles=[...p.obstacles!,{x0:40,x1:130,y0:180,y1:260}];assert.deepEqual(routeOpticalPhrases(score,p,[row.base]),routeOpticalPhrases(structuredClone(score),p,[row.base]));
+});
+
+test('quiet opening reranks the same24 native bows and saturates without rewarding distant floating',()=>{
+ const row=fixture.pools[0],old=placement(row),p={...old,phraseRouting:'optical-open' as const},before=opticalPhraseCandidates(row.base,old),after=opticalPhraseCandidates(row.base,p);
+ assert.equal(after.length,24);assert.equal(after.filter(q=>q.ink.contour!.side===-1).length,12);assert.equal(after.filter(q=>q.ink.contour!.side===1).length,12);
+ const shapeKey=(q:typeof after[number])=>JSON.stringify(q.ink.contour);
+ assert.deepEqual(after.map(shapeKey).sort(),before.map(shapeKey).sort(),'no expansion, distortion or extra search');
+ for(const q of after){const original=before.find(old=>shapeKey(old)===shapeKey(q))!;assert.ok(Math.abs(q.cost-original.cost-q.open!.openingCost-q.open!.axisCost)<1e-12);assert.deepEqual(q.ink.endpointIds,original.ink.endpointIds);}
+ const ink=after[0].ink,none=opticalOpeningHealth(ink,{...p,balanceObstacles:[]});assert.equal(none.openingCost,0);
+ const remote=opticalOpeningHealth(ink,{...p,balanceObstacles:[{x0:row.domain.start.x,x1:row.domain.start.x+row.domain.span/3,y0:1e4,y1:1e4+2}]});assert.equal(remote.openingCost,0);
+ const score={phrases:[{id:row.base.id}],totalTicks:576} as unknown as QuantizedGridScore;
+ assert.deepEqual(routeOpticalPhrases(score,p,[row.base]),routeOpticalPhrases(structuredClone(score),p,[row.base]));
+ assert.deepEqual(routeOpticalPhrases(score,old,[row.base]),routeOpticalPhrases(structuredClone(score),old,[row.base]),'successor cache cannot leak into history');
 });

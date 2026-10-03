@@ -4,6 +4,7 @@ import { readStudioState, type StudioSessionHost } from '../render/janko/studio-
 import { cloneComparisonSvg, comparisonReadings, no14GoldComparisonPages } from './prepared-comparison';
 
 import {readPublishedComparison,PUBLISHED_COMPARISON_KEY} from './published-state';
+import no14Selection from '../render/janko/no14-published-profile.json';
 
 const root = document.getElementById('source-review')!;
 const prepared = document.getElementById('janko-studio')!;
@@ -15,6 +16,7 @@ let mode: 'source' | 'engraving' = 'engraving';
 try { if (sessionStorage.getItem('janko-candidates-mode') === 'source') mode = 'source'; } catch { /* private session */ }
 // Separate from development PDF choices: no migration or deletion of saved work.
 const state=readPublishedComparison(sessionStorage);
+const no14PageCount=no14Selection.pageSvgSha256.length;
 let {readingId,mobilePane,workId,referencePage,isoPage}=state;
 const zoom=state.zoom;
 const persist=()=>{try{sessionStorage.setItem(PUBLISHED_COMPARISON_KEY,JSON.stringify({readingId,mobilePane,workId,referencePage,isoPage,zoom}));}catch{/* private session */}};
@@ -88,16 +90,16 @@ function updateIdentity():void{
  for(const role of roles){
   const container=panes[role].container;
   container.querySelector<HTMLElement>('.source-identity-label')!.textContent=role==='reference'?(no14?'Original · Schuberth 1848':'Original · Henle HN 45'):(no14?'ISO · Schumann No. 14 GOLD':'ISO · Schumann No. 13');
-  container.querySelector<HTMLElement>('.source-page')!.textContent=no14?(role==='reference'?`Printed p. ${original.folio} · ${referencePage+1} / 2`:`ISO page ${isoPage+1} / 4 · 64 written bars`):(role==='reference'?'Printed p. 15 · mm. 35–36':'Internal 38–40 · split ending / fp pickup');
+  container.querySelector<HTMLElement>('.source-page')!.textContent=no14?(role==='reference'?`Printed p. ${original.folio} · ${referencePage+1} / 2`:isoPage<no14PageCount?`ISO page ${isoPage+1} / ${no14PageCount} · 64 written bars`:`Saved ISO page unavailable · ${no14PageCount} current pages`):(role==='reference'?'Printed p. 15 · mm. 35–36':'Internal 38–40 · split ending / fp pickup');
   container.querySelector<HTMLElement>('.source-edition')!.textContent=no14?`Schuberth & Co., December 1848 first issue, plate 1232, pp. 16–17 · Brahms-Institut ABH 5.2.187. ISO: operator-selected No. 14 GOLD; Philippe Hardy encoding under the Free Art License; separate source and encoding provenance.`:`${imageDocument.edition}. ${citation.caption}`;
   container.querySelector<HTMLAnchorElement>('.source-link')!.href=original.url;
   const catalogue=container.querySelector<HTMLAnchorElement>('.source-catalogue')!;catalogue.href=doc.source;catalogue.textContent=no14?'First-issue catalogue ↗':'Henle edition ↗';
-  for(const button of container.querySelectorAll<HTMLButtonElement>('[data-page-action]')){const current=role==='reference'?referencePage:isoPage,max=role==='reference'?1:3;button.hidden=!no14;button.disabled=button.dataset.pageAction==='previous'?current===0:current===max;}
+  for(const button of container.querySelectorAll<HTMLButtonElement>('[data-page-action]')){const current=role==='reference'?referencePage:isoPage,max=role==='reference'?1:no14PageCount-1;button.hidden=!no14;button.disabled=button.dataset.pageAction==='previous'?current===0:current>=max;}
  }
 }
 for(const role of roles)for(const button of panes[role].container.querySelectorAll<HTMLButtonElement>('[data-page-action]'))button.addEventListener('click',()=>{
  if(workId!=='schumann-14')return;const step=button.dataset.pageAction==='next'?1:-1;
- if(role==='reference')referencePage=Math.max(0,Math.min(1,referencePage+step));else isoPage=Math.max(0,Math.min(3,isoPage+step));
+ if(role==='reference')referencePage=Math.max(0,Math.min(1,referencePage+step));else isoPage=Math.max(0,Math.min(no14PageCount-1,isoPage+step));
  persist();updateIdentity();if(role==='reference')loadOriginal();else syncInk();
 });
 work.addEventListener('change',()=>{workId=work.value as typeof workId;persist();updateIdentity();loadOriginal();syncInk();updateMobile();});
