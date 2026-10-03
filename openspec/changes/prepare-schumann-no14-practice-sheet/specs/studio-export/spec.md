@@ -98,15 +98,19 @@ The selected A/Bodoni No14 treatment SHALL be a complete piece-specific GOLD pro
 
 
 ### Requirement: Coherent home score selection
-The existing home SHALL show a clearly labelled Score picker for published Bach, Brahms and Schumann No14. Selection SHALL update complete score identity, accepted prepared Reference pages and matching controls/download together without leaving home or displaying a separate unrelated score promotion. Bach playback SHALL remain supported; non-Bach written sheets SHALL not silently use another piece's playback or omit repeat semantics. Score revision SHALL be labelled separately from release freshness.
+The existing home SHALL show a clearly labelled Score picker for eligible published Bach and Schumann No14. Brahms SHALL remain excluded from public home without deleting its studio/history/source data. Selection SHALL update complete score identity, accepted prepared pages and matching controls/download together without leaving home or displaying a separate unrelated score promotion. Bach playback SHALL remain supported; No14 SHALL not silently use another piece's playback or omit repeat semantics. Home SHALL offer Print and matching PDF download without a Reference link. Visible home labels, metadata and Guide descriptions SHALL use isomorphic notation/engraving. Score revision SHALL be labelled separately from release freshness.
 
 #### Scenario: Schumann selected on home
 - **WHEN** No14 is selected through the picker or an allowlisted URL
-- **THEN** home displays the exact accepted No14 pages with complete work/opus/piece/composer identity, Print/Reference and its verified matching PDF, and reload/Back respect selection without mutating studio saved state
+- **THEN** home displays the exact accepted No14 pages with complete work/opus/piece/composer identity, Print and its verified matching PDF, and reload/Back respect selection without mutating studio saved state
 
-#### Scenario: Brahms selected on home
-- **WHEN** Brahms is selected
-- **THEN** its accepted complete score and identity replace the prior score and Print/Reference remain available without a false Bach/No14 PDF or unsupported Play
+#### Scenario: Ineligible Brahms home URL
+- **WHEN** home is opened with `?score=brahms-op118-no1`
+- **THEN** the eligible default Bach is displayed coherently, Brahms is absent from the picker, and retained Brahms studio data is unchanged
+
+#### Scenario: Public home chrome and Guide
+- **WHEN** home or its Guide is read
+- **THEN** no home Reference control or visible Jánko/Yangko label is present, isomorphic notation/engraving describes the product, and existing musical/keyboard guidance remains useful
 
 #### Scenario: A new release is incomplete or stale
 - **WHEN** its score revision, page identity or matching No14 PDF verification fails

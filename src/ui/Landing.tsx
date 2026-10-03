@@ -51,7 +51,7 @@ export const Landing: React.FC = () => {
     const stop = watchDeployedRelease(new URL('active-release.json', base).href, async release => {
       const parsed = JSON.parse(release.data) as ActiveData;
       // Validate the active musical data before committing the coherent release.
-      for (const id of ['bach-goldberg-var1', 'brahms-op118-no1']) resolveActiveScore(id, parsed);
+      resolveActiveScore(BACH_ID, parsed);
       const next = readHomeSheets(release.reference, release.manifest.canonicalRevisions);
       const bytes = await verifiedNo14Pdf(base, next['schumann-op68-no14-gold']);
       if (disposed) return;
@@ -206,7 +206,7 @@ export const Landing: React.FC = () => {
               Iso-Notation
             </div>
             <div className="text-[11px] text-neutral-500">
-              Jánko isomorphic engraving · {releaseStatus}
+              Isomorphic notation · {releaseStatus}
             </div>
           </div>
 
@@ -334,8 +334,6 @@ export const Landing: React.FC = () => {
                 download={choice.pdf}
                 className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100"
               >Download PDF</a> : null}
-              <a href={`${import.meta.env.BASE_URL}janko.html?score=${choice.reference}#reference`}
-                className="rounded-full border border-neutral-300 px-4 py-1.5 text-sm text-neutral-700 transition hover:bg-neutral-100">Reference</a>
               <span className="ml-auto hidden text-sm text-neutral-400 sm:inline">
                 {pages.length} {pages.length === 1 ? 'page' : 'pages'} · A4
               </span>
@@ -366,7 +364,7 @@ export const Landing: React.FC = () => {
       )}
 
       <footer className="landing-chrome border-t border-neutral-200 py-3 text-center text-xs text-neutral-400">
-        Jánko engraving
+        Isomorphic engraving
       </footer>
     </div>
   );

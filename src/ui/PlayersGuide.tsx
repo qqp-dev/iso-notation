@@ -271,7 +271,7 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
           </p>
           <GuideFigure
             svg={engraving.pitchSvg}
-            label="Chromatic octave C4 to B4 engraved by the Janko engine"
+            label="Chromatic octave C4 to B4 in isomorphic notation"
             caption={
               <>
                 A chromatic octave climbing C4–B4, engraved by the real
@@ -309,7 +309,7 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
           </p>
           <GuideFigure
             svg={engraving.rhythmSvg}
-            label="Beamed sixteenths, dotted eighth, and quarter engraved by the Janko engine"
+            label="Beamed sixteenths, dotted eighth, and quarter in isomorphic notation"
             caption={
               <>
                 One bar, three beats: four beamed 16ths, a flagged dotted 8th
@@ -327,7 +327,7 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
           </p>
           <GuideFigure
             svg={engraving.restsSvg}
-            label="Quarter, half, whole, eighth and sixteenth rests engraved by the Janko engine"
+            label="Quarter, half, whole, eighth and sixteenth rests in isomorphic notation"
             caption={
               <>
                 Five bars, one silence per value: quarter, half, whole-bar,
@@ -355,7 +355,7 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
           </p>
           <GuideFigure
             svg={engraving.handsSvg}
-            label="Opposed stems, chord bracket, and merged unison engraved by the Janko engine"
+            label="Opposed stems, chord bracket, and merged unison in isomorphic notation"
             caption={
               <>
                 One bar, three beats: opposed stems at opposite ends of the
@@ -410,7 +410,7 @@ export const PlayersGuide: React.FC<PlayersGuideProps> = ({ onClose }) => {
           </p>
           <GuideFigure
             svg={engraving.barSvg}
-            label="Bach Goldberg Variation 1 measure 1 engraved by the Janko engine"
+            label="Bach Goldberg Variation 1 measure 1 in isomorphic notation"
             caption={
               <>
                 Measure 1, both hands. Right hand:{' '}

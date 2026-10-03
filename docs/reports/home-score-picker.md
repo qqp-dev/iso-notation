@@ -1,5 +1,15 @@
 # Home score picker — 2026-10-03
 
+## Public-home cleanup after operator confirmation
+
+The operator confirms PR152's picker works and restricts home to presentable Bach and Schumann No. 14. Brahms is excluded from the home allowlist, including direct URL selection; an ineligible query displays the normal Bach default with matching identity, pages and download. Its historical/source/studio data remains intact. The home Reference link is removed. Header/footer, browser title/description and Guide accessibility captions now use isomorphic notation/engraving. Internal engine names, studio URLs and the Guide's teaching content remain unchanged.
+
+Four focused home cases pass in 7.85 seconds, including eligible URLs, retained studio-only Brahms inventory and exact No. 14 PDF verification. The coupled existing Brahms studio/print contract passes in 7.43 seconds. Configured TypeScript, strict OpenSpec and production build pass (Vite 24.75 seconds). Actual compiled HOME/Guide browser verification passes 44 checks at desktop and 390px widths, including both eligible choices, ineligible Brahms URL fallback, exact accepted SVG DOM/PDF bytes, no Reference control, terminology, Guide content, Back/reload and unchanged studio storage; zero JavaScript exceptions. Browser receipt: `/tmp/iso-home-public-cleanup-review-20261003/browser-result.json`.
+
+Visual impact: affected on home controls and terminology; sheet ink is not affected. The current prepared Reference/candidate hashes and No. 14 PDF bytes remain exactly those recorded below. No score/engine/source/profile/PDF or studio change is included; the separately approved No. 14 profile publication is owned by its parallel task. This section records reviewable work before merge/publication; the PR will hold the actual deployment/public verification receipt. Protected ports 5175/5191, cancelled study and all 65 root status entries are preserved. The earlier three-score inventory and Reference-link description below are PR152 preparation history, superseded for home eligibility by this correction.
+
+## PR152 preparation and publication history
+
 The operator requested a score picker on the home page. The earlier separate No14 banner left Bach's title and sheet visible and required leaving home to read Schumann. This correction puts an explicit Score picker on home and changes complete title/composer, pages and supported controls together.
 
 Home consumes the exact full-page SVG strings from the existing prepared Reference artifact; it does not engrave sheets in the browser. Current accepted inventories are Bach two pages, Brahms six pages and Schumann No14 three pages. Brahms is the complete Intermezzo, not the obsolete mm.1–9 excerpt still described in older benchmark metadata. No14 remains the operator-selected Round81 profile, with125underlined figure starts and all ending rests; the separate one-reference-per-bar study is not adopted.
