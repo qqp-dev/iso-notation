@@ -45,7 +45,7 @@ try{
   execFileSync('rsvg-convert',['-f','pdf','-o',pdf,sv],{stdio:'pipe'});pdfs.push(pdf);
  }
  execFileSync('pdfunite',[...pdfs,out],{stdio:'pipe'});
- const manifest={status:gold?'operator-selected No14 Round81':historical?'historical operator-selected No14 absolute GOLD':'unlanded practice candidate; visual acceptance pending',profile,sourceId:e.score.id,sourceHash:SCHUMANN_NO14_APPROVED_SHA256,
+ const manifest={status:gold?'operator-requested No14 condensed absolute reference':historical?'historical operator-selected No14 absolute GOLD':'unlanded practice candidate; visual acceptance pending',profile,sourceId:e.score.id,sourceHash:SCHUMANN_NO14_APPROVED_SHA256,
   notes:e.score.notes.length,writtenBars:64,unfoldedOccurrences:96,pages,augmentationDots:dots.map(d=>({owners:d.ownerIds,shape:d.shape})),options:e.options,tokens:e.tokens,pageSvgSha256:pageHashes,pdfSha256:hash(readFileSync(out)),
   ...(selected?{modelSha256:hash(JSON.stringify(e.score)),profileSha256:hash(JSON.stringify(e)),acceptedOrigin:gold?NO14_PUBLISHED_IDENTITY:NO14_GOLD_ACCEPTANCE,acceptedPageSvgSha256:gold?NO14_PUBLISHED_IDENTITY.pageSvgSha256:NO14_GOLD_ACCEPTANCE.pageSvgSha256,studioPageSvgSha256:studioPageHashes,printChanges:identity.printChanges,performedMapping:e.score.writtenPresentation,
    ...(gold?{readingPresentation:e.score.readingPresentation,editionCorrections:e.score.editionCorrections}: {})}: {})};

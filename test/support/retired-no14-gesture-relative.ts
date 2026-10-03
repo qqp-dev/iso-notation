@@ -1,8 +1,9 @@
+/** Test-only geometry fixture; no runtime/studio score builder is exported. */
 /** Bounded reading projection of the written No14 gestures, without harmonic inference. */
-import {no14GoldProfile} from './no14-gold';
-import {linearPitch,relativeClass} from './anchor-solver';
-import {resolveJankoOptions} from './types';
-import type {QuantizedNote,QuantizedGridScore} from '../../model/types';
+import {no14GoldProfile} from '../../src/render/janko/no14-gold';
+import {linearPitch,relativeClass} from '../../src/render/janko/anchor-solver';
+import {resolveJankoOptions} from '../../src/render/janko/types';
+import type {QuantizedNote,QuantizedGridScore} from '../../src/model/types';
 
 export const NO14_GESTURE_RELATIVE_ID='schumann-op68-no14-gesture-relative';
 export const NO14_GESTURE_UNDERLINE_ID='schumann-op68-no14-gesture-underlined';

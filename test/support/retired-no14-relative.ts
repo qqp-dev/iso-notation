@@ -1,7 +1,8 @@
+/** Test-only geometry fixture; no runtime/studio score builder is exported. */
 /** First-page reading experiment. These are practical bass references, not roots. */
-import { no14GoldProfile } from './no14-gold';
-import { resolveJankoOptions } from './types';
-import {ANCHOR_TARGET,linearPitch,prepareAnchorProblem,relativeClass,solveAnchors,type AnchorSolution} from './anchor-solver';
+import { no14GoldProfile } from '../../src/render/janko/no14-gold';
+import { resolveJankoOptions } from '../../src/render/janko/types';
+import {ANCHOR_TARGET,linearPitch,prepareAnchorProblem,relativeClass,solveAnchors,type AnchorSolution} from '../../src/render/janko/anchor-solver';
 export const NO14_RELATIVE_SCORE_ID = 'schumann-op68-no14-relative-study';
 export const NO14_RELATIVE_BASELINE_ID = 'schumann-op68-no14-relative-baseline';
 export function no14RelativeBaselineProfile(solution?:AnchorSolution) {

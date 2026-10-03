@@ -7,7 +7,7 @@ import {tmpdir} from 'node:os';
 import {join} from 'node:path';
 import {no14GoldProfile,no14GoldOriginProfile,no14GoldPrePrintProfile,no14GoldPrePrintSvgAsAccepted,no14GoldStudioSvg,NO14_GOLD_ACCEPTANCE,NO14_GOLD_IDENTITY,NO14_GOLD_REFERENCE_ID,NO14_GOLD_NOTICE} from '../src/render/janko/no14-gold';
 import {no14PublishedProfile,NO14_PUBLISHED_IDENTITY} from '../src/render/janko/no14-published';
-import {no14GestureOpenProfile} from '../src/render/janko/no14-gesture-relative';
+import {no14AbsoluteCondensedProfile} from '../src/render/janko/no14-absolute-condensed';
 import {assertSystemSvgTranslation,systemSvgFragments} from './support/system-svg-translation';
 import {pageBodyBounds,runningHeaderBand,RUNNING_HEAD_AIR} from '../src/render/janko/page-booking';
 import {lintJankoScore} from '../src/render/janko/linter';
@@ -35,7 +35,7 @@ test('GOLD preserves selected A music while declaring the operator-requested pri
  assert.throws(()=>no14GoldPrePrintSvgAsAccepted(`<svg>${NO14_GOLD_NOTICE.replaceAll('&','&amp;')}</svg>`,1));
 });
 
-test('Reference settles current No14 lazily once, preserves all11 prior SVGs and exposes the exact selected Round81 pages',()=>{
+test('Reference settles current No14 lazily once, preserves all11 prior SVGs and exposes the declared condensed absolute pages',()=>{
  const solves:string[]=[];setLayoutJankoScoreObserver(score=>solves.push(score.id??''));
  try{
   const config=createStudioConfig();const no14Id=config.scores[NO14_GOLD_REFERENCE_ID].score.id;
@@ -47,11 +47,12 @@ test('Reference settles current No14 lazily once, preserves all11 prior SVGs and
   const svgs=[...html.matchAll(/<svg\b[\s\S]*?<\/svg>/g)].map(m=>m[0]);
   assert.equal(svgs.length,18);assert.deepEqual(svgs.slice(7).map(hash),oldReferenceHashes,'all prior canonical page/crop vectors remain exact');
   assert.deepEqual(svgs.slice(0,3).map(hash),NO14_PUBLISHED_IDENTITY.pageSvgSha256);
-  assert.deepEqual(no14PublishedProfile(),no14GestureOpenProfile(),'publication adopts the accepted candidate without any profile or ink delta');
+  assert.deepEqual(no14PublishedProfile(),no14AbsoluteCondensedProfile(),'publication and candidate share one absolute profile');
   assert.equal(hash(JSON.stringify(no14PublishedProfile())),NO14_PUBLISHED_IDENTITY.profileSha256);assert.equal(hash(JSON.stringify(no14PublishedProfile().score)),NO14_PUBLISHED_IDENTITY.modelSha256);
   assert.match(svgs[0],/Album für die Jugend · Op\. 68/);assert.match(svgs[0],/No\. 14 · Kleine Studie/);
   for(const svg of svgs.slice(1,3)){assert.match(svg,/class="janko-running-head"/);assert.match(svg,/Album für die Jugend · Op\. 68/);assert.match(svg,/No\. 14 · Kleine Studie/);}
   const no14=html.slice(0,html.indexOf('data-score="brahms-op118-no1"'));
+  assert.doesNotMatch(no14,/Underlined absolute figure starts|relative interior digits/,'current Reference cues describe absolute notation');
   assert.match(no14,/Robert Schumann/);assert.match(no14,/No\. 14 · Kleine Studie/);assert.doesNotMatch(no14,/Variatio 1|draft|Practice candidate/);
   assert.match(no14,/schumann-op68-no14-gold\.pdf" download/);assert.match(no14,/data-lint-ok="true"/);assert.match(no14,/0 violations, 0 warnings/);
   assert.deepEqual([...no14.matchAll(/data-page="(\d+)"/g)].map(m=>Number(m[1])),[1,2,3]);
@@ -93,7 +94,7 @@ test('compact running headers preserve page1 music and every later complete syst
  assert.throws(()=>assertSystemSvgTranslation(original,original.replace('Robert Schumann','foreign')+'<path d="M 0 0 L 1 1"/>',0,'extra ink'));
 });
 
-test('published No14 PDF is fresh, matches selected Round81 ink and has three complete vector pages with font/source notices',()=>{
+test('published No14 PDF is fresh, matches declared absolute ink and has three complete vector pages with font/source notices',()=>{
  const publicPdf='public/schumann-op68-no14-gold.pdf',dir=mkdtempSync(join(tmpdir(),'no14-gold-freshness-'));
  try{
   const fresh=join(dir,'gold.pdf');execFileSync(process.execPath,['--import','tsx','scripts/export-no14-practice-pdf.ts','--profile','gold','--out',fresh],{stdio:'pipe'});

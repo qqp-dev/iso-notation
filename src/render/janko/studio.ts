@@ -41,8 +41,7 @@ import {NO14_PRACTICE_SCORE_ID,no14PracticeProfile} from './no14-practice';
 import {NO14_WRITTEN_SCORE_ID,projectNo14Written} from './no14-written';
 import {NO14_GOLD_REFERENCE_ID,NO14_GOLD_PDF} from './no14-gold';
 import {NO14_PUBLISHED_IDENTITY,no14PublishedProfile} from './no14-published';
-import {NO14_GESTURE_RELATIVE_ID,NO14_GESTURE_UNDERLINE_ID,NO14_GESTURE_REFINED_ID,NO14_GESTURE_CENTERED_ID,NO14_GESTURE_CONDENSED_ID,NO14_GESTURE_OPTICAL_ID,NO14_GESTURE_OPEN_ID,no14GestureRelativeProfile,no14GestureUnderlineProfile,no14GestureRefinedProfile,no14GestureCenteredProfile,no14GestureCondensedProfile,no14GestureOpticalProfile,no14GestureOpenProfile} from './no14-gesture-relative';
-import {NO14_RELATIVE_SCORE_ID,NO14_RELATIVE_BASELINE_ID,no14RelativeProfile,no14RelativeBaselineProfile} from './no14-relative';
+import {NO14_ABSOLUTE_CONDENSED_ID,no14AbsoluteCondensedProfile} from './no14-absolute-condensed';
 import { buildSchumannNo30Draft } from '../../scores/schumann-no30-draft';
 import { buildSchumannNo13Draft } from '../../scores/schumann-no13-draft';
 import {
@@ -297,15 +296,7 @@ export function createStudioConfig(overrides: Partial<JankoStudioConfig> = {}): 
     measuresPerSystem: 4, systemsPerPage: 4, gridWritingPolicy: 'overlaid-beat-grid',
     writtenTies: 'source', verticalPlacement: 'content-aware' });
   const scores: Record<string, StudioScore> = {
-    [NO14_GESTURE_OPEN_ID]: {id:NO14_GESTURE_OPEN_ID,...no14GestureOpenProfile()},
-    [NO14_GESTURE_OPTICAL_ID]: {id:NO14_GESTURE_OPTICAL_ID,...no14GestureOpticalProfile()},
-    [NO14_GESTURE_CONDENSED_ID]: {id:NO14_GESTURE_CONDENSED_ID,...no14GestureCondensedProfile()},
-    [NO14_GESTURE_CENTERED_ID]: {id:NO14_GESTURE_CENTERED_ID,...no14GestureCenteredProfile()},
-    [NO14_GESTURE_REFINED_ID]: {id:NO14_GESTURE_REFINED_ID,...no14GestureRefinedProfile()},
-    [NO14_GESTURE_UNDERLINE_ID]: {id:NO14_GESTURE_UNDERLINE_ID,...no14GestureUnderlineProfile()},
-    [NO14_GESTURE_RELATIVE_ID]: {id:NO14_GESTURE_RELATIVE_ID,...no14GestureRelativeProfile()},
-    [NO14_RELATIVE_SCORE_ID]: {id:NO14_RELATIVE_SCORE_ID,...no14RelativeProfile()},
-    [NO14_RELATIVE_BASELINE_ID]: {id:NO14_RELATIVE_BASELINE_ID,...no14RelativeBaselineProfile()},
+    [NO14_ABSOLUTE_CONDENSED_ID]: {id:NO14_ABSOLUTE_CONDENSED_ID,...no14AbsoluteCondensedProfile()},
     [NO14_PRACTICE_SCORE_ID]: {id:NO14_PRACTICE_SCORE_ID,...no14PracticeProfile()},
     [NO14_WRITTEN_SCORE_ID]: {id:NO14_WRITTEN_SCORE_ID,...no14PracticeProfile(),score:projectNo14Written().score},
     [NO14_GOLD_REFERENCE_ID]: {id:NO14_GOLD_REFERENCE_ID,...no14PublishedProfile()},
@@ -1075,11 +1066,11 @@ export function renderReferenceView(config: JankoStudioConfig = createStudioConf
   return [
     '<section class="view-panel" id="view-reference" data-view="reference">',
     ...(no14?[renderReferenceScore(NO14_GOLD_REFERENCE_ID,no14.score,no14.options,no14.tokens,undefined,[
-      {start:1,count:3,title:'No. 14 · opening',caption:'Underlined absolute figure starts, relative interior digits and the selected automatic phrasing.'},
+      {start:1,count:3,title:'No. 14 · opening',caption:'Absolute pitch symbols, original register and the selected automatic phrasing.'},
       {start:32,count:2,title:'No. 14 · repeat entrance',caption:'Repeat measures 33–64, with room before the first notes.'},
       {start:48,count:1,title:'No. 14 · independent values',caption:'Shared attacks retain separate long and short values and two independent slurs.'},
       {start:63,count:2,title:'No. 14 · closing phrase',caption:'The final0 continues the left-hand figure, followed by the source-written rests.'}
-    ],{badge:'GOLD',revision:NO14_PUBLISHED_IDENTITY.profileSha256,title:`${no14.score.printIdentity?.composer} · ${no14.score.printIdentity?.work} · ${no14.score.printIdentity?.piece}`,introduction:'64 written bars · repeat 33–64 · three pages · underlined figure starts',download:NO14_GOLD_PDF})]:[]),
+    ],{badge:'GOLD',revision:NO14_PUBLISHED_IDENTITY.profileSha256,title:`${no14.score.printIdentity?.composer} · ${no14.score.printIdentity?.work} · ${no14.score.printIdentity?.piece}`,introduction:'64 written bars · repeat 33–64 · three pages · absolute pitch symbols',download:NO14_GOLD_PDF})]:[]),
     renderReferenceScore(
       BRAHMS_STUDIO_SCORE_ID,
       brahms.score,

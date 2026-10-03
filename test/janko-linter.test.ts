@@ -22,7 +22,7 @@ import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { createStudioConfig } from '../src/render/janko/studio';
 import { PreparedJankoWindows } from '../src/render/janko/prepared-windows';
 import { ROUND_60_CANDIDATES as CURRENT_CANDIDATES } from '../src/render/janko/candidates';
-import {no14RelativeProfile,no14RelativeBaselineProfile} from '../src/render/janko/no14-relative';
+import {no14RelativeProfile,no14RelativeBaselineProfile} from './support/retired-no14-relative';
 import { buildInkScene, type InkScene } from '../src/render/janko/ink-scene';
 import { buildChordDurationSpecimenScore } from '../src/scores/chord-duration-specimen';
 import { importSchumann } from '../src/scores/schumann-no43';
@@ -2656,7 +2656,7 @@ test('reading bracket audit rejects substituted glyphs, detached owners and fore
 });
 
 test('gesture-relative parity audit rejects a digit-only substitution on absolute rails',async()=>{
- const {no14GestureRelativeProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const {no14GestureRelativeProfile}=await import('./support/retired-no14-gesture-relative');
  const {checkReadingParityIntegrity}=await import('../src/render/janko/linter');
  const p=no14GestureRelativeProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:1,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0];
  const check=()=>{const out:LintViolation[]=[];checkReadingParityIntegrity(l,p.options,out);return out;};
@@ -2669,7 +2669,7 @@ test('gesture-relative parity audit rejects a digit-only substitution on absolut
 });
 
 test('underline reading audit rejects successive parity shifts, wider masks and foreign underline intrusions',async()=>{
- const {no14GestureUnderlineProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const {no14GestureUnderlineProfile}=await import('./support/retired-no14-gesture-relative');
  const {checkReadingParityIntegrity}=await import('../src/render/janko/linter');
  const p=no14GestureUnderlineProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:1,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0],scene=buildInkScene(l,p.options,p.tokens,p.score);
  const check=()=>{const out:LintViolation[]=[];checkReadingHeadIntegrity(p.score,l,scene,out,p.options,p.tokens);checkReadingParityIntegrity(l,p.options,out);return out;};
@@ -2684,7 +2684,7 @@ test('underline reading audit rejects successive parity shifts, wider masks and 
 });
 
 test('wide shipped A anchor underline stays inside ordinary horizontal protection',async()=>{
- const {no14GestureUnderlineProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const {no14GestureUnderlineProfile}=await import('./support/retired-no14-gesture-relative');
  const p=no14GestureUnderlineProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:43,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0],scene=buildInkScene(l,p.options,p.tokens,p.score),pieces=[...scene.heads.values()].find(ps=>ps.some(p=>p.primitive.kind==='glyph'&&p.primitive.digit==='A'&&p.reading?.isAnchor))!;
  const mark=pieces.find(p=>p.paint.cls==='janko-reading-anchor-underline')!,glyph=pieces.find(p=>p.paint.cls==='janko-digit')!,mask=pieces.find(p=>p.primitive.kind==='erase')!;
  assert.ok(glyph.box.x1-glyph.box.x0>mask.box.x1-mask.box.x0,'real shipped wide glyph is the regression trigger');
@@ -2693,7 +2693,7 @@ test('wide shipped A anchor underline stays inside ordinary horizontal protectio
 });
 
 test('reading glyph optical seats reject undeclared displacement and false musical-axis metadata',async()=>{
- const {no14GestureOpticalProfile}=await import('../src/render/janko/no14-gesture-relative');
+ const {no14GestureOpticalProfile}=await import('./support/retired-no14-gesture-relative');
  const p=no14GestureOpticalProfile(),prepared=new PreparedJankoWindows(p.score,[{measureStart:60,measureCount:1}],p.options,p.tokens),l=[...prepared.systems.values()][0],scene=buildInkScene(l,p.options,p.tokens,p.score);
  const check=()=>{const out:LintViolation[]=[];checkReadingHeadIntegrity(p.score,l,scene,out,p.options,p.tokens);return out;};
  assert.deepEqual(check(),[]);
