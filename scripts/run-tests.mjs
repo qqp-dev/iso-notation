@@ -1,9 +1,10 @@
 #!/usr/bin/env node
-/** One complete, bounded Node test run. Planning helpers are importable without running tests. */
-import { spawnSync } from 'node:child_process';
+/** Explicit bounded/full Node test plans. Planning helpers are importable without running tests. */
+import { spawn } from 'node:child_process';
 import { readdirSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { FAST_FILES, changedPaths, packageCoverage, parseRequest, releasePlan, reviewedPatterns, testDependencies, validateSelectedFiles } from './test-selection.mjs';
 
 const root = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const exclusive = [
@@ -33,7 +34,7 @@ export function partitionTestFiles(files) {
   const ordinary = files.filter(file => !exclusive.includes(file));
   return [
     { phase: 'ordinary', files: ordinary, concurrency: ordinaryConcurrency },
-    ...exclusive.map(file => ({ phase: 'exclusive', files: [file], concurrency: 1 })),
+    ...exclusive.filter(file => files.includes(file)).map(file => ({ phase: 'exclusive', files: [file], concurrency: 1 })),
   ];
 }
 
@@ -67,25 +68,96 @@ export function formatChildFailure({ phase, files, elapsedMs, result }) {
     `stdout:\n${excerpt(result.stdout)}\nstderr:\n${excerpt(result.stderr)}`;
 }
 
-if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
-  const files = discoverTestFiles();
-  const batches = partitionTestFiles(files);
-  validateTestPlan(files, batches);
-  console.log(`[npm test] ${files.length} files; ordinary concurrency=${ordinaryConcurrency}; exclusive=${exclusive.join(', ')}`);
+
+export function buildTestPlan(request, projectRoot = root) {
+  const discovered = discoverTestFiles(projectRoot);
+  let selected;
+  if (request.mode === 'full') selected = { scope: 'full discovered suite', files: discovered, coverage: [] };
+  else if (request.mode === 'fast') selected = { scope: 'focused fast contracts', files: validateSelectedFiles(FAST_FILES, discovered), coverage: [] };
+  else if (request.mode === 'files') selected = { scope: 'focused explicit files', files: validateSelectedFiles(request.files, discovered), coverage: [] };
+  else if (request.mode === 'release') {
+    const paths = changedPaths(projectRoot, request.base, request.head);
+    selected = releasePlan(paths, discovered, testDependencies(projectRoot),
+      reviewedPatterns(projectRoot, request.base, request.head), packageCoverage(projectRoot, request.base, request.head, paths));
+  }
+  else throw new Error('unknown test profile: ' + request.mode);
+  const batches = partitionTestFiles(selected.files).flatMap(batch => {
+    const filtered = batch.files.filter(file => selected.patterns?.[file]);
+    return [{ ...batch, files: batch.files.filter(file => !selected.patterns?.[file]) },
+      ...filtered.map(file => ({ ...batch, files: [file], pattern: selected.patterns[file] }))].filter(batch => batch.files.length);
+  });
+  validateTestPlan(selected.files, batches);
+  return { ...selected, ...(request.mode === 'release' ? { base: request.base, head: request.head } : {}), discoveredFiles: discovered.length, batches, pattern: request.pattern };
+}
+
+function capture() {
+  let first = '', last = '', length = 0;
+  return {
+    add(value) { const s = String(value); length += s.length; first = (first + s).slice(0, 4000); last = (last + s).slice(-12000); },
+    text() { return length <= 12000 ? last : length <= 16000 ? first + last.slice(-(length - first.length)) : first + '\n… [truncated] …\n' + last; },
+  };
+}
+
+/** Live streams plus bounded receipts; Node remains the test executor. */
+export async function runTestBatches(batches, {
+  projectRoot = root, pattern, output = process.stdout, errors = process.stderr,
+  progressMs = 15000,
+} = {}) {
   for (const batch of batches) {
     if (!batch.files.length) continue;
-    console.log(`[npm test: ${batch.phase}] ${batch.files.length} file(s), concurrency=${batch.concurrency}: ${batch.files.join(', ')}`);
-    const started = Date.now();
-    const result = spawnSync(process.execPath, [
-      '--import', 'tsx', '--test', `--test-concurrency=${batch.concurrency}`, ...batch.files,
-    ], { cwd: root, encoding: 'utf8', maxBuffer: 64 * 1024 * 1024 });
-    if (result.stdout) process.stdout.write(result.stdout);
-    if (result.stderr) process.stderr.write(result.stderr);
-    if (result.error || result.signal || result.status !== 0) {
-      console.error(formatChildFailure({ ...batch, elapsedMs: Date.now() - started, result }));
-      process.exitCode = 1;
-      break;
+    output.write('[npm test: ' + batch.phase + '] ' + batch.files.length + ' file(s), concurrency=' + batch.concurrency + ': ' + batch.files.join(', ') + '\n');
+    const selectedPattern = batch.pattern ?? pattern;
+    if (selectedPattern !== undefined) output.write('[npm test] representative case filter: ' + selectedPattern + '\n');
+    const started = Date.now(), stdout = capture(), stderr = capture();
+    const result = await new Promise(resolveResult => {
+      let child, error;
+      // A launcher contract can itself run under node:test. The owned child
+      // is a new executor, not a test worker participating in that parent.
+      const env = { ...process.env };
+      delete env.NODE_TEST_CONTEXT;
+      const args = ['--import', import.meta.resolve('tsx'), '--test', '--test-reporter=tap', '--test-concurrency=' + batch.concurrency,
+        ...(selectedPattern === undefined ? [] : ['--test-name-pattern=' + selectedPattern]), ...batch.files];
+      try { child = spawn(process.execPath, args, { cwd: projectRoot, env, stdio: ['ignore', 'pipe', 'pipe'] }); }
+      catch (caught) { resolveResult({ status: null, signal: null, error: caught, stdout: '', stderr: '' }); return; }
+      child.stdout.on('data', value => { stdout.add(value); output.write(value); });
+      child.stderr.on('data', value => { stderr.add(value); errors.write(value); });
+      child.on('error', caught => { error = caught; });
+      const int = () => child.kill('SIGINT'), term = () => child.kill('SIGTERM');
+      process.once('SIGINT', int); process.once('SIGTERM', term);
+      const timer = setInterval(() => output.write('[npm test: ' + batch.phase + '] running ' + (Date.now() - started) + 'ms; awaiting child completion\n'), progressMs);
+      child.once('close', (status, signal) => {
+        clearInterval(timer); process.removeListener('SIGINT', int); process.removeListener('SIGTERM', term);
+        resolveResult({ status, signal, error, stdout: stdout.text(), stderr: stderr.text() });
+      });
+    });
+    if (selectedPattern !== undefined) {
+      const plain = result.stdout.replace(/\u001b\[[0-9;]*m/g, '');
+      // Node 26 reports an empty file as one passing file-level subtest;
+      // that is not evidence that a requested named case was exercised.
+      const names = [...plain.matchAll(/^# Subtest: (.+)$/gm)].map(match => match[1]);
+      const named = names.some(name => !batch.files.some(file => name === file || name === resolve(projectRoot, file)));
+      if (/(?:#|ℹ)\s+pass 0\b/.test(plain) || !named)
+        result.error = new Error('explicit name pattern selected no passing cases');
     }
-    console.log(`[npm test: ${batch.phase}] passed in ${Date.now() - started}ms`);
+    if (result.error || result.signal || result.status !== 0) {
+      errors.write(formatChildFailure({ ...batch, elapsedMs: Date.now() - started, result }) + '\n');
+      return { ok: false, failedPhase: batch.phase, result };
+    }
+    output.write('[npm test: ' + batch.phase + '] passed in ' + (Date.now() - started) + 'ms\n');
   }
+  return { ok: true };
+}
+
+if (process.argv[1] && resolve(process.argv[1]) === fileURLToPath(import.meta.url)) {
+  try {
+    const request = parseRequest(process.argv.slice(2)), plan = buildTestPlan(request);
+    if (request.list) console.log(JSON.stringify(plan, null, 2));
+    else {
+    console.log('[npm test] ' + plan.scope + ': ' + plan.files.length + '/' + plan.discoveredFiles + ' discovered files selected; ordinary concurrency=' + ordinaryConcurrency);
+    if (plan.scope !== 'full discovered suite') console.log('[npm test] Focused coverage; complete sweep is available only through npm run test:full.');
+      for (const coverage of plan.coverage) console.log('[coverage] ' + coverage.path + ' -> ' + coverage.area + ': ' + (coverage.checks.join(', ') || 'documentation; no runtime change'));
+      const result = await runTestBatches(plan.batches, { pattern: plan.pattern });
+      if (!result.ok) process.exitCode = 1;
+    }
+  } catch (error) { console.error('[npm test] ' + error.message); process.exitCode = 1; }
 }

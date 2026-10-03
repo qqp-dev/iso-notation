@@ -49,6 +49,7 @@ import {
   knockoutHalfExtents,
   layoutJankoScore,
   renderJankoPage,
+  setLayoutJankoScoreObserver,
 } from '../src/render/janko/engine';
 import {
   MIDPOINT_MAX_RINGS,
@@ -111,10 +112,31 @@ function cents(actual: number, expected: number, eps: number): boolean {
 
 function pagesOf(options = OPTIONS, tokens = TOKENS): string {
   let svg = '';
-  const total = countJankoPages(SCORE, options, tokens);
-  for (let i = 0; i < total; i++) svg += renderJankoPage(SCORE, i, options, tokens);
+  const layouts = layoutJankoScore(SCORE, options, tokens);
+  const total = countJankoPages(SCORE, options, tokens, layouts);
+  assert.equal(total, 6, 'the historical spread retains all six page witnesses');
+  for (let i = 0; i < total; i++) svg += renderJankoPage(SCORE, i, options, tokens, layouts);
   return svg;
 }
+
+test('Page-loop ownership: six pages share one fresh solve per call; changed tokens stay independent', () => {
+  const owners: Array<{ options: typeof OPTIONS; tokens: typeof TOKENS }> = [];
+  setLayoutJankoScoreObserver((score, options, tokens) => {
+    assert.equal(score, SCORE);
+    owners.push({ options, tokens });
+  });
+  try {
+    const first = pagesOf(), second = pagesOf();
+    assert.equal(first, second, 'independent fresh calls retain exact page output');
+    assert.equal(owners.length, 2, 'each six-page call owns its own complete solve');
+    const changed = { ...TOKENS, upperExtensionThreshold: 72 };
+    assert.notEqual(pagesOf(OPTIONS, changed), first, 'changed profile is solved and engraved independently');
+    assert.equal(owners.length, 3);
+    assert.equal(owners[2].tokens.upperExtensionThreshold, 72);
+  } finally {
+    setLayoutJankoScoreObserver(null);
+  }
+});
 
 // ---------------------------------------------------------------------------
 // A. The literal-mode extra ink is gone; nothing else moved.

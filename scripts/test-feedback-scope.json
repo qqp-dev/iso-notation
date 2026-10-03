@@ -1,0 +1,62 @@
+{
+  "schema": 1,
+  "purpose": "One reviewed fixture/import and same-owner page-helper transformation; later bytes are unfiltered.",
+  "files": [
+    {
+      "path": "test/janko-round37.test.ts",
+      "before": "a1469fd10eb1e499cf4d759bcffd73cd02ef1ca92385cac6cac3224f98b41614",
+      "after": "0515bbce3d4860a2404343fcfee99a7024efd5ec8ee041ce3472e82a39dba9ae"
+    },
+    {
+      "path": "test/janko-round38.test.ts",
+      "before": "8d2f1e8c0480b13a960d73225ce925ad44fc9e8d7f17891332f993f47649bcdd",
+      "after": "a6e9e8a3b07b3cd8a0bf237251ce52f0b17cdaa11277e6f9c3264bfb743c594c"
+    },
+    {
+      "path": "test/janko-round39.test.ts",
+      "before": "f2370265f5bcab892e891dda541ac14de3ef718eb985d6fe10e9c510f56f2027",
+      "after": "6d2f7060590dbf780be43c2ba385f2cccf2c0519283f6a7d31c8256d055b421a"
+    },
+    {
+      "path": "test/janko-round41.test.ts",
+      "before": "8d730cfa0fd2ed64c80437b4b8cdb4c82510edb07d28b383a257d5794bd92cc3",
+      "after": "481ee893c6bf192ef0af6cc434e3615837d8060038f8402c4dbe49b8bcf79f60"
+    },
+    {
+      "path": "test/janko-round46.test.ts",
+      "before": "2425fd9b6ce4e83bec9c1b9362b35fbc3be80e30737e111841d2ad3d253f36c3",
+      "after": "fabc4779aeb5f6ad2524b482257f9842b06ddc07091dfbe0c7c23b41e435f524"
+    },
+    {
+      "path": "test/janko-layout-reuse.test.ts",
+      "before": "6eca9cdf1afa1e0358e20d8811e0d1e1258823c85a81d1e0bb6325371257c3ad",
+      "after": "5a56a23cbd06085fe7f2203407e32531d930ce24e5a8463f316ba5e50aad9bce"
+    },
+    {
+      "path": "test/janko-studio.test.ts",
+      "before": "5fca248d19887245918aee9a1af1dcd53f0e28eb9d499ee57a0c29c5eab8bf2f",
+      "after": "c6fe25f28f32569eec81c7ea4bf9447c497318fa27f061ba2346e3e61ea84ab6"
+    },
+    {
+      "path": "test/support/round37-fixtures.ts",
+      "before": null,
+      "after": "b1bbe1bdd89cbdc539fd9b9766977e9bd0b8d0800d0676e811b9f8ce44d32ffe"
+    },
+    {
+      "path": "test/support/round38-fixtures.ts",
+      "before": null,
+      "after": "fd122df27f254d1bfc42b2325c724dbb127da75841df9cef6fb88a7af278a273"
+    },
+    {
+      "path": "test/support/round39-fixtures.ts",
+      "before": null,
+      "after": "8d6dae74157402d9d706955446b12cb7839ec3733e1c938c6de0d8f40117ec26"
+    },
+    {
+      "path": "test/support/round41-fixtures.ts",
+      "before": null,
+      "after": "56961c3ec2777e77114ebe6c532746a2637ed1a9229ad6fc23be80a0073d8ba8"
+    }
+  ],
+  "reviewedBase": "a2d7e0a147f70f78dc30f0bbb204bd1a526a886e"
+}
