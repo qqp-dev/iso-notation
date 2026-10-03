@@ -10,7 +10,7 @@
  * `ticksPerMeasure`): a score's own time signatures only matter insofar as
  * they land on that grid (see {@link checkMidiReadiness}).
  */
-import { computePageGeometry, countJankoSystems } from '../render/janko/engine';
+import { computePageGeometry, countJankoSystems, type JankoSystemLayout } from '../render/janko/engine';
 import { getTickX, splitTick } from '../render/janko/geometry';
 import {
   DEFAULT_JANKO_OPTIONS,
@@ -45,21 +45,22 @@ export function locateTick(
   score: QuantizedGridScore,
   tick: number,
   options = DEFAULT_JANKO_OPTIONS,
-  tokens = DEFAULT_JANKO_TOKENS
+  tokens = DEFAULT_JANKO_TOKENS,
+  layouts?: readonly JankoSystemLayout[]
 ): PlayheadPosition {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const totalTicks = Math.max(1, score.totalTicks || 0);
   const clamped = Math.min(Math.max(0, tick), totalTicks - 1);
   const totalMeasures = Math.max(1, Math.ceil(totalTicks / t.ticksPerMeasure));
-  const totalSystems = Math.max(1, countJankoSystems(score, o, t));
+  const totalSystems = Math.max(1, layouts?.length ?? countJankoSystems(score, o, t));
   const { measureOffset, tickInMeasure } = splitTick(clamped, t);
   const m = Math.min(measureOffset, totalMeasures - 1);
   const s = Math.min(Math.floor(m / o.measuresPerSystem), totalSystems - 1);
   const page = Math.floor(s / o.systemsPerPage);
   const systemInPage = s % o.systemsPerPage;
-  const geo = computePageGeometry(o, t, score);
-  const sys = geo.systems[Math.min(systemInPage, geo.systems.length - 1)];
+  const geo = layouts ? undefined : computePageGeometry(o, t, score);
+  const sys = layouts?.[s]?.geometry ?? geo!.systems[Math.min(systemInPage, geo!.systems.length - 1)];
   const slot = Math.min(
     Math.max(0, m - s * o.measuresPerSystem),
     o.measuresPerSystem - 1
@@ -88,22 +89,25 @@ export function tickAtPoint(
   ptX: number,
   ptY: number,
   options = DEFAULT_JANKO_OPTIONS,
-  tokens = DEFAULT_JANKO_TOKENS
+  tokens = DEFAULT_JANKO_TOKENS,
+  layouts?: readonly JankoSystemLayout[]
 ): number {
   const o = resolveJankoOptions(options);
   const t = resolveJankoTokens(tokens);
   const totalTicks = Math.max(1, score.totalTicks || 0);
   const totalMeasures = Math.max(1, Math.ceil(totalTicks / t.ticksPerMeasure));
-  const totalSystems = Math.max(1, countJankoSystems(score, o, t));
+  const totalSystems = Math.max(1, layouts?.length ?? countJankoSystems(score, o, t));
   const pages = Math.max(1, Math.ceil(totalSystems / o.systemsPerPage));
   const p = Math.min(Math.max(0, page), pages - 1);
-  const geo = computePageGeometry(o, t, score);
+  const pageSystems = layouts?.slice(p * o.systemsPerPage, (p + 1) * o.systemsPerPage);
+  const geo = layouts ? undefined : computePageGeometry(o, t, score);
+  const systems = pageSystems?.map(layout => layout.geometry) ?? geo!.systems;
   let systemInPage = 0;
-  for (let i = 0; i < geo.systems.length; i++) {
-    if (ptY >= geo.systems[i].slotTopY) systemInPage = i;
+  for (let i = 0; i < systems.length; i++) {
+    if (ptY >= systems[i].slotTopY) systemInPage = i;
   }
   const s = Math.min(p * o.systemsPerPage + systemInPage, totalSystems - 1);
-  const sys = geo.systems[Math.min(systemInPage, geo.systems.length - 1)];
+  const sys = systems[Math.min(systemInPage, systems.length - 1)];
   const slot = Math.min(
     Math.max(0, Math.floor((ptX - sys.staffLeft) / sys.measureWidth)),
     o.measuresPerSystem - 1

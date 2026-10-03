@@ -2,7 +2,8 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { buildBachGoldbergVar1Score } from '../src/scores/bach-goldberg-var1';
 import { QuantizedGridScore } from '../src/model/types';
-import { computePageGeometry } from '../src/render/janko/engine';
+import { resolveActiveScore } from '../src/scores/active';
+import { computePageGeometry, layoutJankoScore } from '../src/render/janko/engine';
 import {
   DEFAULT_JANKO_OPTIONS,
   DEFAULT_JANKO_TOKENS,
@@ -151,4 +152,22 @@ test('checkMidiReadiness: off-grid and oversized scores are refused with reasons
   );
   assert.equal(huge.ok, false);
   assert.match((huge as { reasons: string[] }).reasons.join(';'), /too large/);
+});
+
+
+test('Bach home playback consumes actual settled page2 staff bounds and preserves measure seeking', () => {
+  const { score, options, tokens } = resolveActiveScore('bach-goldberg-var1');
+  const layouts = layoutJankoScore(score, options, tokens);
+  for (const layout of layouts) {
+    const tick = layout.index * options.measuresPerSystem * tokens.ticksPerMeasure;
+    const pos = locateTick(score, tick, options, tokens, layouts);
+    assert.equal(pos.topY, layout.geometry.staffTopY - 3);
+    assert.equal(pos.botY, layout.geometry.staffBotY + 3);
+    assert.equal(pos.page, Math.floor(layout.index / options.systemsPerPage));
+    const y = (layout.geometry.staffTopY + layout.geometry.staffBotY) / 2;
+    for (let slot = 0; slot < options.measuresPerSystem; slot++) {
+      const x = layout.geometry.staffLeft + (slot + .5) * layout.geometry.measureWidth;
+      assert.equal(tickAtPoint(score, pos.page, x, y, options, tokens, layouts), tick + slot * tokens.ticksPerMeasure);
+    }
+  }
 });

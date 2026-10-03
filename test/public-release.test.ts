@@ -7,7 +7,7 @@ const read = (name: string) => readFileSync(name, 'utf8');
 test('public Landing exposes Bach Play, Sheet and Guide without either MIDI import route', () => {
   const landing = read('src/ui/Landing.tsx');
   const html = read('index.html');
-  for (const label of ['Play', 'Sheet', 'Guide', 'goldberg-variation-1.pdf']) assert.ok(landing.includes(label), label);
+  for (const label of ['Play', 'Sheet', 'Guide', 'goldberg-variation-1.pdf', 'home-score-picker']) assert.ok(landing.includes(label), label);
   assert.doesNotMatch(landing, /Upload MIDI|type="file"|accept="\.mid|parseMidiToScore|FileReader|processMidiFile|isDraggingFile|Drop a \.mid file|addEventListener\(['"](?:dragover|dragleave|drop)['"]|onDrop=|onDragOver=/);
   assert.doesNotMatch(html, /\bupload(?:ing)?\b|drag.{0,30}drop.{0,30}midi/i);
 });
@@ -26,11 +26,13 @@ test('root Play/Sheet and PDF consume one verified active release; Pages declare
   const viewer = read('src/render/janko/prepared/viewer.ts');
   const workflow = read('.github/workflows/deploy.yml');
   assert.match(root, /watchDeployedRelease\(/);
-  assert.match(root, /resolveActiveScore\(BACH_ID, parsed\)/);
-  assert.match(root, /setScore\(next\.score\)/);
+  assert.match(root, /resolveActiveScore\(id, parsed\)/);
+  assert.match(root, /readHomeSheets\(release\.reference, release\.manifest\.canonicalRevisions\)/);
+  assert.match(root, /verifiedNo14Pdf\(base, next\['schumann-op68-no14-gold'\]\)/);
   assert.match(root, /setActiveData\(parsed\)/);
-  assert.match(root, /setPdfUrl\(release\.pdfUrl\)/);
-  assert.match(root, /useJankoPages\(score, activeData\)/);
+  assert.match(root, /next\[BACH_ID\]\.pdfUrl = release\.pdfUrl/);
+  assert.match(root, /setSheets\(next\)/);
+  assert.doesNotMatch(root, /useJankoPages\(/);
   assert.match(sheet, /resolveActiveScore\(/);
   assert.match(viewer, /watchDeployedRelease\(/);
   assert.match(workflow, /npm run test:release/);
