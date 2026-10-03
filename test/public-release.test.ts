@@ -26,7 +26,7 @@ test('root Play/Sheet and PDF consume one verified active release; Pages declare
   const viewer = read('src/render/janko/prepared/viewer.ts');
   const workflow = read('.github/workflows/deploy.yml');
   assert.match(root, /watchDeployedRelease\(/);
-  assert.match(root, /resolveActiveScore\(id, parsed\)/);
+  assert.match(root, /resolveActiveScore\(BACH_ID, parsed\)/);
   assert.match(root, /readHomeSheets\(release\.reference, release\.manifest\.canonicalRevisions\)/);
   assert.match(root, /verifiedNo14Pdf\(base, next\['schumann-op68-no14-gold'\]\)/);
   assert.match(root, /setActiveData\(parsed\)/);
